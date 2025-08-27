@@ -1,0 +1,124 @@
+@page "/create-appointment"
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.ViewModels
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin")]
+@inject ClinicDbContext DbContext
+@inject NavigationManager NavigationManager
+
+<PageTitle>Schedule New Appointment</PageTitle>
+
+<h1>Schedule New Appointment</h1>
+
+<EditForm Model="@_appointmentModel" OnValidSubmit="HandleSubmit" FormName="CreateAppointment">
+    <DataAnnotationsValidator/>
+    <ValidationSummary/>
+
+    <div class="mb-3">
+        <label class="form-label">Client</label>
+        <select class="form-select" @onchange="OnClientSelected">
+            <option value="">Select a Client</option>
+            @foreach (var client in _clientList)
+            {
+                <option value="@client.Id">@client.FirstName @client.LastName</option>
+            }
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Pet</label>
+        <InputSelect class="form-select" @bind-Value="_appointmentModel.AnimalId" disabled="@(_petList.Count == 0)">
+            <option value="">Select a Pet</option>
+            @foreach (var pet in _petList)
+            {
+                <option value="@pet.Id">@pet.Name</option>
+            }
+        </InputSelect>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">With Staff</label>
+        <InputSelect class="form-select" @bind-Value="_appointmentModel.StaffId">
+            <option value="">Select Staff</option>
+            @foreach (var staff in _staffList)
+            {
+                <option value="@staff.Id">@staff.FirstName @staff.LastName</option>
+            }
+        </InputSelect>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Date & Time</label>
+        <InputDate Type="InputDateType.DateTimeLocal" class="form-control"
+                   @bind-Value="_appointmentModel.AppointmentDateTime"/>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Reason for Visit</label>
+        <InputText class="form-control" @bind-Value="_appointmentModel.Reason"/>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Schedule Appointment</button>
+    <a href="/appointments" class="btn btn-secondary">Cancel</a>
+</EditForm>
+
+
+@code {
+    private List<Client> _clientList = new();
+    private List<Animal> _petList = new();
+    private List<Staff> _staffList = new();
+
+    private readonly CreateAppointmentViewModel _appointmentModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _clientList = await DbContext.Clients.AsNoTracking().ToListAsync();
+        _staffList = await DbContext.Staff.AsNoTracking().ToListAsync();
+    }
+
+    private async Task OnClientSelected(ChangeEventArgs e)
+    {
+        _petList.Clear();
+        _appointmentModel.ClientId = null;
+        _appointmentModel.AnimalId = null;
+
+        var selectedValue = e.Value?.ToString();
+
+        if (int.TryParse(selectedValue, out var clientId))
+        {
+            _appointmentModel.ClientId = clientId;
+            _petList = await DbContext.Animals
+                .Where(p => p.ClientId == clientId)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (_appointmentModel.ClientId is null || _appointmentModel.AnimalId is null || _appointmentModel.StaffId is null) return;
+
+        var newAppointment = new Appointment
+        {
+            ClientId = _appointmentModel.ClientId.Value,
+            AnimalId = _appointmentModel.AnimalId.Value,
+            StaffId = _appointmentModel.StaffId.Value,
+            AppointmentDateTime = _appointmentModel.AppointmentDateTime,
+            EndTime = _appointmentModel.AppointmentDateTime.AddMinutes(30),
+
+            Reason = _appointmentModel.Reason,
+            Status = "Scheduled"
+        };
+
+        DbContext.Appointments.Add(newAppointment);
+        await DbContext.SaveChangesAsync();
+
+        NavigationManager.NavigateTo("/appointments");
+    }
+
+}

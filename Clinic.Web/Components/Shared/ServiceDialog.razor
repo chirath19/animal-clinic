@@ -1,0 +1,57 @@
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.ViewModels
+@using Microsoft.EntityFrameworkCore
+@inject ClinicDbContext DbContext
+@inject DialogService DialogService
+
+<RadzenTemplateForm TItem="ServiceViewModel" Data="@Model" Submit="@OnSubmit">
+    <DataAnnotationsValidator/>
+    <RadzenStack Gap="1.5rem">
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Service Name" Component="Name"/>
+            <RadzenTextBox @bind-Value="@Model.Name" Name="Name" Style="width: 100%;"/>
+            <RadzenRequiredValidator Component="Name" Text="Service name is required"/>
+        </RadzenStack>
+
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Category" Component="ServiceCategoryId"/>
+            <RadzenDropDown Data="@_categories" TextProperty="Name" ValueProperty="Id"
+                            @bind-Value="@Model.ServiceCategoryId" Name="ServiceCategoryId" Style="width: 100%;"/>
+            <RadzenRequiredValidator Component="ServiceCategoryId" Text="Category is required"/>
+        </RadzenStack>
+
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Description"/>
+            <RadzenTextArea @bind-Value="@Model.Description" Style="width: 100%;"/>
+        </RadzenStack>
+
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Price" Component="Price"/>
+            <RadzenNumeric TValue="decimal" @bind-Value="@Model.Price" Name="Price" Format="C" Style="width: 100%;"/>
+            <RadzenRequiredValidator Component="Price" Text="Price is required"/>
+        </RadzenStack>
+    </RadzenStack>
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem" Class="rz-mt-4">
+        <RadzenButton ButtonType="ButtonType.Submit" Text="Save"/>
+        <RadzenButton Text="Cancel" Click="@(() => DialogService.Close(null))" ButtonStyle="ButtonStyle.Light"/>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter] public ServiceViewModel Model { get; set; } = new();
+
+    private List<ServiceCategory> _categories = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _categories = await DbContext.ServiceCategories.AsNoTracking().OrderBy(sc => sc.Name).ToListAsync();
+    }
+
+    private void OnSubmit(ServiceViewModel model)
+    {
+        DialogService.Close(model);
+    }
+
+}

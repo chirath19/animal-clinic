@@ -1,0 +1,153 @@
+@page "/inventory"
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.Components.Shared
+@using Clinic.Web.ViewModels
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin, Receptionist")]
+@inject ClinicDbContext DbContext
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+<PageTitle>Inventory</PageTitle>
+
+<RadzenCard>
+    <RadzenRow AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
+        <RadzenColumn Size="6">
+            <RadzenText Text="Inventory Items" TextStyle="TextStyle.H3" TagName="TagName.H1"/>
+        </RadzenColumn>
+        <RadzenColumn Size="6" class="rz-text-align-right">
+            <RadzenButton Text="Add New Item" Icon="add_circle_outline" Click="AddItem"/>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenDataGrid Data="@_itemList" TItem="InventoryItem" AllowPaging="true" AllowSorting="true"
+                    AllowFiltering="true">
+        <Columns>
+            <RadzenDataGridColumn TItem="InventoryItem" Property="Name" Title="Item Name"/>
+            <RadzenDataGridColumn TItem="InventoryItem" Property="Category" Title="Category" Width="150px"/>
+            <RadzenDataGridColumn TItem="InventoryItem" Property="Form" Title="Form" Width="150px"/>
+            <RadzenDataGridColumn TItem="InventoryItem" Property="QuantityInStock" Title="Qty In Stock" Width="140px"
+                                  TextAlign="TextAlign.Center">
+                <Template Context="item">
+                    @if (item.QuantityInStock <= item.ReorderLevel)
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="@item.QuantityInStock.ToString()"/>
+                    }
+                    else
+                    {
+                        @item.QuantityInStock
+                    }
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="InventoryItem" Property="UnitPrice" Title="Unit Price" FormatString="{0:C}"
+                                  Width="140px" TextAlign="TextAlign.Right"/>
+            <RadzenDataGridColumn TItem="InventoryItem" Title="Actions" Sortable="false" Filterable="false"
+                                  TextAlign="TextAlign.Center" Width="120px">
+                <Template Context="item">
+                    <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="edit" Size="ButtonSize.Small"
+                                  Click="@(() => EditItem(item))"/>
+                    <RadzenButton ButtonStyle="ButtonStyle.Danger" Shade="Shade.Lighter" Icon="delete"
+                                  Size="ButtonSize.Small" Click="@(() => DeleteItem(item))"
+                                  @onclick:stopPropagation="true"/>
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</RadzenCard>
+
+@code {
+    private List<InventoryItem> _itemList = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadItems();
+    }
+
+    private async Task LoadItems()
+    {
+        _itemList = await DbContext.InventoryItems.AsNoTracking().ToListAsync();
+    }
+
+    private async Task AddItem()
+    {
+        var result = await DialogService.OpenAsync<InventoryItemDialog>("Add New Inventory Item",
+            new Dictionary<string, object>(),
+            new DialogOptions { Width = "600px" });
+
+        if (result is InventoryItemViewModel newModel)
+        {
+            var newItem = new InventoryItem
+            {
+                Name = newModel.Name,
+                Description = newModel.Description,
+                Category = newModel.Category,
+                Form = newModel.Form, // Add this line
+                QuantityInStock = newModel.QuantityInStock,
+                ReorderLevel = newModel.ReorderLevel,
+                UnitPrice = newModel.UnitPrice,
+                SupplierId = newModel.SupplierId
+            };
+
+            await DbContext.InventoryItems.AddAsync(newItem);
+            await DbContext.SaveChangesAsync();
+            await LoadItems();
+        }
+    }
+
+    private async Task EditItem(InventoryItem item)
+    {
+        var itemToEdit = await DbContext.InventoryItems.FindAsync(item.Id);
+        if (itemToEdit == null) return;
+
+        var model = new InventoryItemViewModel
+        {
+            Id = itemToEdit.Id,
+            Name = itemToEdit.Name,
+            Description = itemToEdit.Description,
+            Category = itemToEdit.Category,
+            Form = itemToEdit.Form, // Add this line
+            QuantityInStock = itemToEdit.QuantityInStock,
+            ReorderLevel = itemToEdit.ReorderLevel,
+            UnitPrice = itemToEdit.UnitPrice,
+            SupplierId = itemToEdit.SupplierId
+        };
+
+        var result = await DialogService.OpenAsync<InventoryItemDialog>($"Edit {item.Name}",
+            new Dictionary<string, object> { { "Model", model } },
+            new DialogOptions { Width = "600px" });
+
+        if (result is InventoryItemViewModel updatedModel)
+        {
+            itemToEdit.Name = updatedModel.Name;
+            itemToEdit.Description = updatedModel.Description;
+            itemToEdit.Category = updatedModel.Category;
+            itemToEdit.Form = updatedModel.Form; // Add this line
+            itemToEdit.QuantityInStock = updatedModel.QuantityInStock;
+            itemToEdit.ReorderLevel = updatedModel.ReorderLevel;
+            itemToEdit.UnitPrice = updatedModel.UnitPrice;
+            itemToEdit.SupplierId = updatedModel.SupplierId;
+
+            await DbContext.SaveChangesAsync();
+            await LoadItems();
+        }
+    }
+
+    private async Task DeleteItem(InventoryItem item)
+    {
+        var confirmed = await DialogService.Confirm($"Are you sure you want to delete {item.Name}?", "Confirm Deletion");
+        if (confirmed == true)
+        {
+            var itemToDelete = await DbContext.InventoryItems.FindAsync(item.Id);
+            if (itemToDelete != null)
+            {
+                DbContext.InventoryItems.Remove(itemToDelete);
+                await DbContext.SaveChangesAsync();
+                await LoadItems();
+            }
+        }
+    }
+
+}

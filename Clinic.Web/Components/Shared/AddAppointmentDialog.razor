@@ -1,0 +1,117 @@
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Microsoft.EntityFrameworkCore
+@inject ClinicDbContext DbContext
+@inject DialogService DialogService
+
+<RadzenTemplateForm TItem="Appointment" Data="@_appointment" Submit="@OnSubmit">
+    <DataAnnotationsValidator/>
+    <RadzenStack Gap="1.5rem">
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Service / Main Reason" Component="Service"/>
+            <RadzenDropDown AllowFiltering="true" Data="@_serviceList" TValue="int"
+                            @bind-Value="@_appointment.ServiceId" Style="width: 100%;" Name="Service"
+                            ValueProperty="Id">
+                <Template Context="serviceContext">
+                    @((serviceContext as Service)?.Name)
+                </Template>
+                <ValueTemplate Context="serviceContext">
+                    @(_serviceList.FirstOrDefault(s => s.Id == _appointment.ServiceId)?.Name)
+                </ValueTemplate>
+            </RadzenDropDown>
+            <RadzenRequiredValidator Component="Service" Text="Please select a service for the appointment"/>
+        </RadzenStack>
+
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Specific Reason (Optional)"/>
+            <RadzenTextBox @bind-Value="@_appointment.Reason" Style="width: 100%;"/>
+        </RadzenStack>
+
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Client" Component="Client"/>
+            <RadzenDropDown @bind-Value="@_appointment.ClientId" TValue="int" Data="@_clientList" ValueProperty="Id"
+                            Name="Client" Change="@OnClientChange" Style="width: 100%;">
+                <Template Context="clientContext">
+                    @((clientContext as Client)?.FirstName) @((clientContext as Client)?.LastName)
+                </Template>
+            </RadzenDropDown>
+            <RadzenRequiredValidator Component="Client" Text="Client is required"/>
+        </RadzenStack>
+
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Pet" Component="Pet"/>
+            <RadzenDropDown @bind-Value="@_appointment.AnimalId" TValue="int" Data="@_petList" TextProperty="Name"
+                            ValueProperty="Id"
+                            Name="Pet" Disabled="@(_petList.Count == 0)" Style="width: 100%;"/>
+            <RadzenRequiredValidator Component="Pet" Text="Pet is required"/>
+        </RadzenStack>
+
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="With Staff" Component="Staff"/>
+            <RadzenDropDown @bind-Value="@_appointment.StaffId" TValue="int" Data="@_staffList" ValueProperty="Id"
+                            Name="Staff" Style="width: 100%;">
+                <Template Context="staffContext">
+                    @((staffContext as Staff)?.FirstName) @((staffContext as Staff)?.LastName)
+                </Template>
+            </RadzenDropDown>
+            <RadzenRequiredValidator Component="Staff" Text="Staff is required"/>
+        </RadzenStack>
+
+        <RadzenRow Gap="1rem">
+            <RadzenColumn>
+                <RadzenLabel Text="Start Time" Component="Start"/>
+                <RadzenDatePicker @bind-Value="@_appointment.AppointmentDateTime" ShowTime="true" Name="Start"
+                                  Style="width: 100%;"/>
+            </RadzenColumn>
+            <RadzenColumn>
+                <RadzenLabel Text="End Time" Component="End"/>
+                <RadzenDatePicker @bind-Value="@_appointment.EndTime" ShowTime="true" Name="End" Style="width: 100%;"/>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenStack>
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem" Class="rz-mt-4">
+        <RadzenButton ButtonType="ButtonType.Submit" Text="Save"/>
+        <RadzenButton Text="Cancel" Click="@(() => DialogService.Close(null))" ButtonStyle="ButtonStyle.Light"/>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter] public DateTime Start { get; set; }
+    [Parameter] public DateTime End { get; set; }
+
+    private readonly Appointment _appointment = new();
+    private List<Service> _serviceList = new();
+    private List<Client> _clientList = new();
+    private List<Animal> _petList = new();
+    private List<Staff> _staffList = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _appointment.AppointmentDateTime = Start;
+        _appointment.EndTime = End;
+        _appointment.Status = "Scheduled";
+
+        _serviceList = await DbContext.Services.AsNoTracking().OrderBy(s => s.Name).ToListAsync();
+        _clientList = await DbContext.Clients.AsNoTracking().OrderBy(c => c.LastName).ToListAsync();
+        _staffList = await DbContext.Staff.AsNoTracking().ToListAsync();
+    }
+
+    private async Task OnClientChange(object value)
+    {
+        _petList.Clear();
+        if (value is int clientId)
+        {
+            _petList = await DbContext.Animals
+                .Where(p => p.ClientId == clientId)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+    }
+
+    private void OnSubmit(Appointment args)
+    {
+        DialogService.Close(args);
+    }
+
+}

@@ -1,0 +1,334 @@
+@page "/appointment-billing/{AppointmentId:int}"
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.ViewModels
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin, Receptionist")]
+@inject ClinicDbContext DbContext
+@inject NavigationManager NavigationManager
+@inject NotificationService NotificationService
+
+<PageTitle>Billing for Appointment</PageTitle>
+
+@if (_appointment == null)
+{
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate"/>
+}
+else
+{
+    <RadzenCard>
+        <RadzenRow AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+            <RadzenColumn Size="8">
+                <RadzenText Text="@($"Billing for Appointment: {_appointment.AppointmentDateTime:D}")"
+                            TextStyle="TextStyle.H5" TagName="TagName.H2"/>
+                <RadzenText
+                    Text="@($"Client: {_appointment.Client.FirstName} {_appointment.Client.LastName} | Pet: {_appointment.Animal.Name}")"
+                    TextStyle="TextStyle.Subtitle1"/>
+            </RadzenColumn>
+            <RadzenColumn Size="4" class="rz-text-align-right">
+                <RadzenButton Text="Back to Calendar" Click="@(() => NavigationManager.NavigateTo("/appointments"))"
+                              Icon="arrow_back" ButtonStyle="ButtonStyle.Secondary"/>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenCard>
+
+    <div class="row mt-4">
+        <div class="col-md-8">
+
+            <RadzenCard class="mb-4">
+                <RadzenText Text="Invoice Items" TextStyle="TextStyle.H6" class="rz-mb-4"/>
+                @if (_invoice != null)
+                {
+                    <RadzenDataGrid Data="@_invoice.InvoiceItems" TItem="InvoiceItem" AllowPaging="false"
+                                    ShowPagingSummary="false">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="InvoiceItem" Property="Description" Title="Description"/>
+                            <RadzenDataGridColumn TItem="InvoiceItem" Property="Quantity" Title="Qty" Width="80px"
+                                                  TextAlign="TextAlign.Center"/>
+                            <RadzenDataGridColumn TItem="InvoiceItem" Property="UnitPrice" Title="Unit Price"
+                                                  FormatString="{0:C}" Width="140px" TextAlign="TextAlign.Right"/>
+                            <RadzenDataGridColumn TItem="InvoiceItem" Property="TotalPrice" Title="Total"
+                                                  FormatString="{0:C}" Width="140px" TextAlign="TextAlign.Right"/>
+                        </Columns>
+                    </RadzenDataGrid>
+                }
+            </RadzenCard>
+
+            @if (_suggestedItems.Any())
+            {
+                <RadzenCard class="mb-4">
+                    <RadzenText Text="Suggested Items from Visit" TextStyle="TextStyle.H6" class="rz-mb-4"/>
+                    <ul class="list-group">
+                        @foreach (var item in _suggestedItems)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                @item.Description
+                                <span>(@item.UnitPrice.ToString("C"))</span>
+                                <RadzenButton Size="ButtonSize.Small" Icon="add"
+                                              Click="@(() => AddItemToInvoice(item))"/>
+                            </li>
+                        }
+                    </ul>
+                </RadzenCard>
+            }
+
+            <RadzenCard>
+                <RadzenText Text="Add Manual Item / Service" TextStyle="TextStyle.H6" class="rz-mb-4"/>
+                <RadzenTemplateForm TItem="AddInvoiceItemViewModel" Data="@_manualAddItem" Submit="HandleManualItemAdd">
+                    <RadzenStack Gap="1rem">
+                        <RadzenDropDown AllowFiltering="true" Data="@_inventoryItems" TextProperty="Name"
+                                        ValueProperty="Id"
+                                        Placeholder="Search for a product..."
+                                        @bind-Value="@_manualAddItem.InventoryItemId" Change="@OnProductSelected"
+                                        Style="width:100%;"/>
+
+                        <RadzenTextBox Placeholder="Or enter a service description..."
+                                       @bind-Value="@_manualAddItem.Description" Style="width:100%;"/>
+
+                        <RadzenRow JustifyContent="JustifyContent.SpaceBetween" Gap="1rem">
+                            <RadzenColumn Size="4">
+                                <RadzenNumeric TValue="int" @bind-Value="@_manualAddItem.Quantity" Placeholder="Qty"/>
+                            </RadzenColumn>
+                            <RadzenColumn Size="6">
+                                <RadzenNumeric TValue="decimal" @bind-Value="@_manualAddItem.UnitPrice"
+                                               Placeholder="Unit Price" Format="C"/>
+                            </RadzenColumn>
+                            <RadzenColumn Size="2">
+                                <RadzenButton ButtonType="ButtonType.Submit" Icon="add_shopping_cart"/>
+                            </RadzenColumn>
+                        </RadzenRow>
+                    </RadzenStack>
+                </RadzenTemplateForm>
+            </RadzenCard>
+
+        </div>
+        <div class="col-md-4">
+            <RadzenCard class="mb-4">
+                <RadzenText Text="Financial Summary" TextStyle="TextStyle.H6" class="rz-mb-4"/>
+                @if (_invoice != null)
+                {
+                    <RadzenRow>
+                        <RadzenColumn>
+                            <RadzenText TextStyle="TextStyle.Subtitle1">Total:</RadzenText>
+                        </RadzenColumn>
+                        <RadzenColumn class="rz-text-align-right">
+                            <RadzenText TextStyle="TextStyle.Subtitle1">@_invoice.TotalAmount.ToString("C")</RadzenText>
+                        </RadzenColumn>
+                    </RadzenRow>
+                    <RadzenRow>
+                        <RadzenColumn>
+                            <RadzenText TextStyle="TextStyle.Subtitle1">Paid:</RadzenText>
+                        </RadzenColumn>
+                        <RadzenColumn class="rz-text-align-right">
+                            <RadzenText TextStyle="TextStyle.Subtitle1">@_invoice.PaidAmount.ToString("C")</RadzenText>
+                        </RadzenColumn>
+                    </RadzenRow>
+                    <hr/>
+                    <RadzenRow>
+                        <RadzenColumn>
+                            <RadzenText TextStyle="TextStyle.H6">Balance Due:</RadzenText>
+                        </RadzenColumn>
+                        <RadzenColumn class="rz-text-align-right">
+                            <RadzenText TextStyle="TextStyle.H6"
+                                        Style="@(_invoice.BalanceDue > 0 ? "color: var(--rz-danger);" : "color: var(--rz-success);")">@_invoice.BalanceDue.ToString("C")</RadzenText>
+                        </RadzenColumn>
+                    </RadzenRow>
+                }
+            </RadzenCard>
+
+            @if (_invoice is { BalanceDue: > 0 })
+            {
+                <RadzenCard>
+                    <RadzenText Text="Record Payment" TextStyle="TextStyle.H6" class="rz-mb-4"/>
+                    <RadzenTemplateForm TItem="RecordPaymentViewModel" Data="@_paymentModel" Submit="HandlePayment">
+                        <RadzenStack Gap="1rem">
+                            <RadzenNumeric TValue="decimal" @bind-Value="@_paymentModel.Amount" Placeholder="Amount"
+                                           Format="C" Style="width:100%;"/>
+                            <RadzenButton Text="Pay Full Balance" Click="PayFullBalance"
+                                          ButtonStyle="ButtonStyle.Secondary"/>
+                            <RadzenButton ButtonType="ButtonType.Submit" Text="Record Payment"
+                                          ButtonStyle="ButtonStyle.Success"/>
+                        </RadzenStack>
+                    </RadzenTemplateForm>
+                </RadzenCard>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int AppointmentId { get; set; }
+
+    private Appointment? _appointment;
+    private Invoice? _invoice;
+    private List<InventoryItem> _inventoryItems = new();
+    private readonly List<InvoiceItem> _suggestedItems = new();
+    private AddInvoiceItemViewModel _manualAddItem = new();
+    private RecordPaymentViewModel _paymentModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _inventoryItems = await DbContext.InventoryItems.AsNoTracking().ToListAsync();
+
+        _appointment = await DbContext.Appointments
+            .Include(a => a.Client)
+            .Include(a => a.Animal)
+            .Include(a => a.Invoices).ThenInclude(i => i.InvoiceItems)
+            .Include(a => a.MedicalRecord).ThenInclude(mr => mr!.Administrations).ThenInclude(admin => admin.InventoryItem)
+            .FirstOrDefaultAsync(a => a.Id == AppointmentId);
+
+        if (_appointment != null)
+        {
+            _invoice = _appointment.Invoices.FirstOrDefault();
+
+            if (_invoice == null)
+            {
+                _invoice = new Invoice
+                {
+                    AppointmentId = _appointment.Id,
+                    ClientId = _appointment.ClientId,
+                    InvoiceDate = DateTime.UtcNow,
+                    Status = "Unpaid"
+                };
+
+                _invoice.InvoiceItems.Add(new InvoiceItem { Description = "Veterinary Consultation", Quantity = 1, UnitPrice = 2000.00m });
+
+                _invoice.TotalAmount = _invoice.InvoiceItems.Sum(item => item.TotalPrice);
+
+                DbContext.Invoices.Add(_invoice);
+                await DbContext.SaveChangesAsync();
+            }
+
+            GenerateSuggestions();
+
+            // --- THIS IS THE FIX ---
+            // Tell the UI to refresh after the initial invoice is loaded/created.
+            StateHasChanged();
+        }
+    }
+
+    private void GenerateSuggestions()
+    {
+        _suggestedItems.Clear();
+        if (_appointment?.MedicalRecord?.Administrations == null) return;
+
+        var alreadyInvoicedItemIds = _invoice?.InvoiceItems.Select(i => i.InventoryItemId).ToList() ?? new List<int?>();
+
+        foreach (var admin in _appointment.MedicalRecord.Administrations)
+        {
+            if (admin.InventoryItemId.HasValue && !alreadyInvoicedItemIds.Contains(admin.InventoryItemId))
+            {
+                _suggestedItems.Add(new InvoiceItem
+                {
+                    Description = admin.MedicationName,
+                    Quantity = 1,
+                    UnitPrice = admin.InventoryItem!.UnitPrice,
+                    InventoryItemId = admin.InventoryItemId
+                });
+            }
+        }
+    }
+
+    private async Task AddItemToInvoice(InvoiceItem item)
+    {
+        if (_invoice == null) return;
+
+        _invoice.InvoiceItems.Add(new InvoiceItem
+        {
+            Description = item.Description,
+            Quantity = item.Quantity,
+            UnitPrice = item.UnitPrice,
+            InventoryItemId = item.InventoryItemId
+        });
+
+        _suggestedItems.Remove(item);
+        await RecalculateInvoice();
+    }
+
+    private void OnProductSelected(object value)
+    {
+        if (value is int inventoryId)
+        {
+            var selectedItem = _inventoryItems.FirstOrDefault(i => i.Id == inventoryId);
+            if (selectedItem != null)
+            {
+                _manualAddItem.Description = selectedItem.Name;
+                _manualAddItem.UnitPrice = selectedItem.UnitPrice;
+            }
+        }
+    }
+
+    private async Task HandleManualItemAdd(AddInvoiceItemViewModel model)
+    {
+        if (_invoice == null) return;
+
+        _invoice.InvoiceItems.Add(new InvoiceItem
+        {
+            Description = model.Description,
+            Quantity = model.Quantity,
+            UnitPrice = model.UnitPrice,
+            InventoryItemId = model.InventoryItemId
+        });
+
+        _manualAddItem = new AddInvoiceItemViewModel();
+        await RecalculateInvoice();
+    }
+
+    private async Task RecalculateInvoice()
+    {
+        if (_invoice == null) return;
+
+        var trackedInvoice = await DbContext.Invoices
+            .Include(i => i.InvoiceItems)
+            .FirstOrDefaultAsync(i => i.Id == _invoice.Id);
+
+        if (trackedInvoice != null)
+        {
+            trackedInvoice.TotalAmount = trackedInvoice.InvoiceItems.Sum(i => i.TotalPrice);
+            await DbContext.SaveChangesAsync();
+
+            _invoice = trackedInvoice;
+
+            StateHasChanged();
+        }
+    }
+
+    private void PayFullBalance()
+    {
+        if (_invoice == null) return;
+        _paymentModel.Amount = _invoice.BalanceDue;
+    }
+
+    private async Task HandlePayment(RecordPaymentViewModel model)
+    {
+        if (_invoice == null) return;
+
+        var trackedInvoice = await DbContext.Invoices.FindAsync(_invoice.Id);
+        if (trackedInvoice == null) return;
+
+        trackedInvoice.PaidAmount += model.Amount;
+
+        if (trackedInvoice.BalanceDue <= 0)
+        {
+            trackedInvoice.Status = "Paid";
+        }
+        else
+        {
+            trackedInvoice.Status = "Partially Paid";
+        }
+
+        await DbContext.SaveChangesAsync();
+        NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Success, Summary = "Success", Detail = "Payment recorded." });
+
+        _invoice = await DbContext.Invoices
+            .Include(i => i.InvoiceItems)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(i => i.Id == _invoice.Id);
+
+        _paymentModel = new RecordPaymentViewModel();
+        StateHasChanged();
+    }
+
+}

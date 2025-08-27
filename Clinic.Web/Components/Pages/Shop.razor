@@ -1,0 +1,211 @@
+@page "/shop"
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.Components.Shared
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin, Receptionist")]
+@inject ClinicDbContext DbContext
+@inject NavigationManager NavigationManager
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+<PageTitle>Pharmacy & Shop</PageTitle>
+
+<RadzenText Text="Pharmacy & Shop" TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-mb-4"/>
+
+<div class="row">
+    <div class="col-md-7">
+        <RadzenCard>
+            <RadzenRow JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center" class="rz-mb-4">
+                <RadzenColumn Size="6">
+                    <RadzenText Text="Available Products" TextStyle="TextStyle.H5"/>
+                </RadzenColumn>
+                <RadzenColumn Size="6">
+                    <RadzenTextBox @bind-Value="@_searchTerm" Placeholder="Search products..." Style="width: 100%;"/>
+                </RadzenColumn>
+            </RadzenRow>
+
+            <RadzenDataGrid @ref="inventoryGrid" Data="@FilteredInventoryItems" TItem="InventoryItem"
+                            AllowPaging="true" PageSize="10" AllowSorting="true">
+                <Columns>
+                    <RadzenDataGridColumn TItem="InventoryItem" Property="Name" Title="Product Name"/>
+                    <RadzenDataGridColumn TItem="InventoryItem" Property="Category" Title="Category" Width="150px"/>
+                    <RadzenDataGridColumn TItem="InventoryItem" Property="UnitPrice" Title="Price" FormatString="{0:C}"
+                                          Width="120px"/>
+                    <RadzenDataGridColumn TItem="InventoryItem" Property="QuantityInStock" Title="In Stock"
+                                          Width="120px"/>
+                    <RadzenDataGridColumn TItem="InventoryItem" Title="" Sortable="false" Filterable="false"
+                                          Width="80px" TextAlign="TextAlign.Center">
+                        <Template Context="item">
+                            <RadzenButton Icon="add_shopping_cart" ButtonStyle="ButtonStyle.Success"
+                                          Size="ButtonSize.Small" Click="@(() => AddItemToBill(item))"
+                                          Disabled="@(item.QuantityInStock <= 0)"/>
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </RadzenCard>
+    </div>
+
+    <div class="col-md-5">
+        <RadzenCard>
+            <RadzenRow AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
+                <RadzenColumn>
+                    <RadzenText Text="Current Bill" TextStyle="TextStyle.H5"/>
+                </RadzenColumn>
+                <RadzenColumn>
+                    <RadzenButton Text="Clear Bill" Click="ClearBill" ButtonStyle="ButtonStyle.Warning"
+                                  Shade="Shade.Lighter" Size="ButtonSize.Small" Visible="@(_currentBillItems.Any())"/>
+                </RadzenColumn>
+            </RadzenRow>
+
+            <RadzenStack Gap="1rem">
+                <RadzenDropDown AllowFiltering="true" Data="@_clientList" TValue="int"
+                                Placeholder="Select a client for this sale..."
+                                @bind-Value="@_selectedClientId" Style="width:100%;" ValueProperty="Id">
+                    <Template Context="client">
+                        @((client as Client)?.FirstName) @((client as Client)?.LastName)
+                    </Template>
+                </RadzenDropDown>
+
+                <RadzenDataGrid Data="@_currentBillItems" TItem="InvoiceItem" AllowPaging="false"
+                                EmptyText="No items added yet.">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="InvoiceItem" Property="Description" Title="Item"/>
+                        <RadzenDataGridColumn TItem="InvoiceItem" Property="Quantity" Title="Qty" Width="70px"/>
+                        <RadzenDataGridColumn TItem="InvoiceItem" Property="TotalPrice" Title="Total"
+                                              FormatString="{0:C}" Width="100px"/>
+                        <RadzenDataGridColumn TItem="InvoiceItem" Title="" Sortable="false" Filterable="false"
+                                              Width="60px">
+                            <Template Context="item">
+                                <RadzenButton ButtonStyle="ButtonStyle.Danger" Shade="Shade.Lighter" Icon="remove"
+                                              Size="ButtonSize.ExtraSmall" Click="@(() => RemoveItemFromBill(item))"/>
+                            </Template>
+                        </RadzenDataGridColumn>
+                    </Columns>
+                </RadzenDataGrid>
+
+                <hr/>
+
+                <RadzenRow>
+                    <RadzenColumn>
+                        <RadzenText TextStyle="TextStyle.H6">Total:</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn class="rz-text-align-right">
+                        <RadzenText
+                            TextStyle="TextStyle.H6">@_currentBillItems.Sum(i => i.TotalPrice).ToString("C")</RadzenText>
+                    </RadzenColumn>
+                </RadzenRow>
+
+                <RadzenButton Text="Finalize Sale" Click="FinalizeSale" ButtonStyle="ButtonStyle.Primary"
+                              Disabled="@(!_currentBillItems.Any() || _selectedClientId == 0)"/>
+            </RadzenStack>
+        </RadzenCard>
+    </div>
+</div>
+
+@code {
+    private RadzenDataGrid<InventoryItem>? inventoryGrid;
+    private List<InventoryItem> _inventoryItems = new();
+    private List<Client> _clientList = new();
+    private List<InvoiceItem> _currentBillItems = new();
+    private int _selectedClientId;
+
+    private string _searchTerm = string.Empty;
+
+    private IEnumerable<InventoryItem> FilteredInventoryItems =>
+        _inventoryItems.Where(item =>
+            string.IsNullOrWhiteSpace(_searchTerm) ||
+            item.Name.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            item.Category.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase)
+        );
+
+    protected override async Task OnInitializedAsync()
+    {
+        _inventoryItems = await DbContext.InventoryItems.AsNoTracking().OrderBy(i => i.Name).ToListAsync();
+        _clientList = await DbContext.Clients.AsNoTracking().OrderBy(c => c.LastName).ToListAsync();
+    }
+
+    private void AddItemToBill(InventoryItem item)
+    {
+        var existingItem = _currentBillItems.FirstOrDefault(i => i.InventoryItemId == item.Id);
+        if (existingItem != null)
+        {
+            existingItem.Quantity++;
+        }
+        else
+        {
+            _currentBillItems.Add(new InvoiceItem
+            {
+                Description = item.Name,
+                Quantity = 1,
+                UnitPrice = item.UnitPrice,
+                InventoryItemId = item.Id
+            });
+        }
+
+        _currentBillItems = new List<InvoiceItem>(_currentBillItems);
+    }
+
+    private void RemoveItemFromBill(InvoiceItem item)
+    {
+        _currentBillItems.Remove(item);
+
+        _currentBillItems = new List<InvoiceItem>(_currentBillItems);
+    }
+
+    private void ClearBill()
+    {
+        _currentBillItems.Clear();
+        _selectedClientId = 0;
+
+        _currentBillItems = new List<InvoiceItem>(_currentBillItems);
+    }
+
+    private async Task FinalizeSale()
+    {
+        if (!_currentBillItems.Any() || _selectedClientId == 0)
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Cannot Finalize", "Please select a client and add at least one item.");
+            return;
+        }
+
+        var totalAmount = _currentBillItems.Sum(i => i.TotalPrice);
+
+        var paidAmount = await DialogService.OpenAsync<PaymentDialog>("Finalize Payment",
+            new Dictionary<string, object> { { "TotalAmount", totalAmount } },
+            new DialogOptions { Width = "400px" });
+
+        if (paidAmount is decimal amount)
+        {
+            var newInvoice = new Invoice
+            {
+                ClientId = _selectedClientId,
+                InvoiceDate = DateTime.UtcNow,
+                Status = "Paid",
+                InvoiceItems = _currentBillItems,
+                TotalAmount = totalAmount,
+                PaidAmount = amount
+            };
+
+            foreach (var item in _currentBillItems)
+            {
+                var inventoryItem = await DbContext.InventoryItems.FindAsync(item.InventoryItemId);
+                if (inventoryItem != null)
+                {
+                    inventoryItem.QuantityInStock -= item.Quantity;
+                }
+            }
+
+            await DbContext.Invoices.AddAsync(newInvoice);
+            await DbContext.SaveChangesAsync();
+
+            NotificationService.Notify(NotificationSeverity.Success, "Success", $"Invoice #{newInvoice.Id} created and paid.");
+
+            NavigationManager.NavigateTo($"/invoice-details/{newInvoice.Id}");
+        }
+    }
+
+}

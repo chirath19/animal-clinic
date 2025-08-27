@@ -1,0 +1,117 @@
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.ViewModels
+@using Microsoft.EntityFrameworkCore
+@inject ClinicDbContext DbContext
+@inject DialogService DialogService
+
+<RadzenTemplateForm TItem="InventoryItemViewModel" Data="@Model" Submit="@OnSubmit">
+    <RadzenStack Gap="1.5rem">
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Item Name" Component="Name"/>
+            <RadzenTextBox @bind-Value="@Model.Name" Name="Name" Style="width: 100%;"/>
+            <RadzenRequiredValidator Component="Name" Text="Item name is required"/>
+        </RadzenStack>
+
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Category" Component="Category"/>
+
+            @* We are replacing the TextBox with a DropDown *@
+            <RadzenDropDown Data="@_categoryList" @bind-Value="@Model.Category" Name="Category"
+                            Style="width: 100%;" AllowClear="true" Placeholder="Select a category..."
+                            Change="@OnCategoryChange"/>
+        </RadzenStack>
+
+        @if (Model.Category == "Pharmacy")
+        {
+            <RadzenStack Gap="0.5rem">
+                <RadzenLabel Text="Form" Component="Form"/>
+                <RadzenDropDown Data="@_formList" @bind-Value="@Model.Form" Name="Form"
+                                Style="width: 100%;" AllowClear="true" Placeholder="Select a form..."/>
+            </RadzenStack>
+        }
+
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Description" Component="Description"/>
+            <RadzenTextArea @bind-Value="@Model.Description" Name="Description" Style="width: 100%;"/>
+        </RadzenStack>
+
+        <RadzenRow Gap="1rem">
+            <RadzenColumn>
+                <RadzenLabel Text="Quantity In Stock" Component="QuantityInStock"/>
+                <RadzenNumeric TValue="int" @bind-Value="@Model.QuantityInStock" Name="QuantityInStock"
+                               Style="width: 100%;"/>
+            </RadzenColumn>
+            <RadzenColumn>
+                <RadzenLabel Text="Reorder Level" Component="ReorderLevel"/>
+                <RadzenNumeric TValue="int" @bind-Value="@Model.ReorderLevel" Name="ReorderLevel" Style="width: 100%;"/>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenRow Gap="1rem">
+            <RadzenColumn>
+                <RadzenLabel Text="Unit Price" Component="UnitPrice"/>
+                <RadzenNumeric TValue="decimal" @bind-Value="@Model.UnitPrice" Name="UnitPrice" Format="C"
+                               Style="width: 100%;"/>
+            </RadzenColumn>
+            <RadzenColumn>
+                <RadzenLabel Text="Supplier" Component="SupplierId"/>
+                <RadzenDropDown Data="@_suppliers" TextProperty="Name" ValueProperty="Id"
+                                AllowClear="true" Placeholder="Select a supplier..."
+                                TValue="int?" @bind-Value="@Model.SupplierId" Style="width: 100%;"/>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenStack>
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem" Class="rz-mt-4">
+        <RadzenButton ButtonType="ButtonType.Submit" Text="Save"/>
+        <RadzenButton Text="Cancel" Click="@(() => DialogService.Close(null))" ButtonStyle="ButtonStyle.Light"/>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter] public InventoryItemViewModel Model { get; set; } = new();
+
+    // This is the new, hard-coded list of categories
+    private readonly List<string> _categoryList = new()
+    {
+        "Pharmacy",
+        "Food",
+        "Supplies",
+        "Accessories",
+        "Grooming",
+        "Lab Services"
+    };
+
+    // Hard-coded list of forms
+    private readonly List<string> _formList = new()
+    {
+        "Tablet",
+        "Capsule",
+        "Liquid",
+        "Injection",
+        "Ointment"
+    };
+
+    private List<Supplier> _suppliers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _suppliers = await DbContext.Suppliers.AsNoTracking().OrderBy(s => s.Name).ToListAsync();
+    }
+
+    private void OnCategoryChange(object value)
+    {
+        // Clear the Form property if the category is no longer "Pharmacy"
+        if (value?.ToString() != "Pharmacy")
+        {
+            Model.Form = null;
+        }
+    }
+
+    private void OnSubmit(InventoryItemViewModel model)
+    {
+        DialogService.Close(model);
+    }
+
+}

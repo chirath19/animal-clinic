@@ -1,0 +1,109 @@
+@page "/suppliers"
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.Components.Shared
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin, Receptionist")]
+@inject ClinicDbContext DbContext
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+<PageTitle>Suppliers</PageTitle>
+
+<RadzenCard>
+    <RadzenRow AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
+        <RadzenColumn Size="6">
+            <RadzenText Text="Suppliers" TextStyle="TextStyle.H3" TagName="TagName.H1"/>
+        </RadzenColumn>
+        <RadzenColumn Size="6" class="rz-text-align-right">
+            <RadzenButton Text="Add New Supplier" Icon="add_circle_outline" Click="AddSupplier"/>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenDataGrid @ref="suppliersGrid" Data="@_supplierList" TItem="Supplier" AllowPaging="true" AllowSorting="true"
+                    AllowFiltering="true">
+        <Columns>
+            <RadzenDataGridColumn TItem="Supplier" Property="Name" Title="Supplier Name"/>
+            <RadzenDataGridColumn TItem="Supplier" Property="ContactPerson" Title="Contact Person"/>
+            <RadzenDataGridColumn TItem="Supplier" Property="Email" Title="Email"/>
+            <RadzenDataGridColumn TItem="Supplier" Property="PhoneNumber" Title="Phone"/>
+            <RadzenDataGridColumn TItem="Supplier" Title="Actions" Sortable="false" Filterable="false"
+                                  TextAlign="TextAlign.Center" Width="120px">
+                <Template Context="supplier">
+                    <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="edit" Size="ButtonSize.Small"
+                                  Click="@(() => EditSupplier(supplier))"/>
+                    <RadzenButton ButtonStyle="ButtonStyle.Danger" Shade="Shade.Lighter" Icon="delete"
+                                  Size="ButtonSize.Small" Click="@(() => DeleteSupplier(supplier))"
+                                  @onclick:stopPropagation="true"/>
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</RadzenCard>
+
+@code {
+    private RadzenDataGrid<Supplier>? suppliersGrid;
+    private List<Supplier> _supplierList = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSuppliers();
+    }
+
+    private async Task LoadSuppliers()
+    {
+        _supplierList = await DbContext.Suppliers.AsNoTracking().ToListAsync();
+    }
+
+    private async Task AddSupplier()
+    {
+        var newSupplier = await DialogService.OpenAsync<SupplierDialog>("Add New Supplier",
+            new Dictionary<string, object>(),
+            new DialogOptions { Width = "500px", Resizable = true });
+
+        if (newSupplier != null)
+        {
+            await DbContext.Suppliers.AddAsync(newSupplier);
+            await DbContext.SaveChangesAsync();
+            await LoadSuppliers();
+            NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Success, Summary = "Success", Detail = "Supplier added." });
+        }
+    }
+
+    private async Task EditSupplier(Supplier supplier)
+    {
+        var supplierToEdit = await DbContext.Suppliers.FindAsync(supplier.Id);
+        if (supplierToEdit == null) return;
+
+        var updatedSupplier = await DialogService.OpenAsync<SupplierDialog>($"Edit {supplier.Name}",
+            new Dictionary<string, object> { { "Supplier", supplierToEdit } },
+            new DialogOptions { Width = "500px", Resizable = true });
+
+        if (updatedSupplier != null)
+        {
+            await DbContext.SaveChangesAsync();
+            await LoadSuppliers();
+            NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Success, Summary = "Success", Detail = "Supplier updated." });
+        }
+    }
+
+    private async Task DeleteSupplier(Supplier supplier)
+    {
+        var confirmed = await DialogService.Confirm($"Are you sure you want to delete {supplier.Name}?", "Confirm Deletion");
+        if (confirmed == true)
+        {
+            var supplierToDelete = await DbContext.Suppliers.FindAsync(supplier.Id);
+            if (supplierToDelete != null)
+            {
+                // Note: This could fail if the supplier is linked to inventory items.
+                // A safer approach is a "soft delete" (setting an IsActive flag).
+                DbContext.Suppliers.Remove(supplierToDelete);
+                await DbContext.SaveChangesAsync();
+                await LoadSuppliers();
+            }
+        }
+    }
+
+}

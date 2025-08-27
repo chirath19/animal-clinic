@@ -1,0 +1,598 @@
+@page "/consultation/{AppointmentId:int}"
+@using Clinic.Common
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.Components.Shared
+@using Clinic.Web.ViewModels
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin, Veterinarian")]
+@inject ClinicDbContext DbContext
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+<PageTitle>Consultation</PageTitle>
+
+@if (_appointment == null)
+{
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate"/>
+}
+else
+{
+    <RadzenCard class="rz-mb-4">
+        <RadzenRow AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+            <RadzenColumn Size="8">
+                <RadzenText Text="@($"Consultation for {_appointment.Animal.Name}")" TextStyle="TextStyle.H5"
+                            TagName="TagName.H2"/>
+                <RadzenText
+                    Text="@($"Client: {_appointment.Client.FirstName} {_appointment.Client.LastName} | Time: {_appointment.AppointmentDateTime:t}")"
+                    TextStyle="TextStyle.Subtitle1"/>
+            </RadzenColumn>
+            <RadzenColumn Size="4" class="rz-text-align-right">
+                <RadzenButton Text="Back to Calendar" Click="@(() => NavigationManager.NavigateTo("/appointments"))"
+                              Icon="arrow_back" ButtonStyle="ButtonStyle.Secondary"/>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenCard>
+
+    @if (_medicalRecord == null)
+    {
+        <div class="text-center rz-p-8">
+            <RadzenText Text="No medical record has been started for this appointment." TextStyle="TextStyle.H6"/>
+            <RadzenButton Text="Start Medical Record" Click="StartMedicalRecord" ButtonStyle="ButtonStyle.Primary"
+                          Icon="add_circle_outline" Size="ButtonSize.Large"/>
+        </div>
+    }
+    else
+    {
+        <RadzenTabs>
+            <Tabs>
+                <RadzenTabsItem Text="SOAP Notes">
+                    <RadzenCard class="rz-mt-4">
+                        <RadzenRow JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center"
+                                   class="rz-mb-4">
+                            <RadzenColumn Size="6">
+                                <RadzenText Text="SOAP Notes" TextStyle="TextStyle.H5"/>
+                            </RadzenColumn>
+                            <RadzenColumn Size="6" class="rz-text-align-right">
+                                <RadzenButton Text="Edit Notes" Icon="edit" ButtonStyle="ButtonStyle.Light"
+                                              Click="EditSoapNotes"/>
+                            </RadzenColumn>
+                        </RadzenRow>
+                        <RadzenFieldset Text="Assessment (Diagnosis)">
+                            <RadzenText>@_medicalRecord.Assessment</RadzenText>
+                        </RadzenFieldset>
+                    </RadzenCard>
+                </RadzenTabsItem>
+
+                @if (_medicalRecord.RequiresMedicationAdmin)
+                {
+                    <RadzenTabsItem Text="Medications Administered">
+                        <RadzenCard class="rz-mt-4">
+                            <RadzenRow JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center"
+                                       class="rz-mb-4">
+                                <RadzenColumn Size="6">
+                                    <RadzenText Text="Medications Administered" TextStyle="TextStyle.H5"/>
+                                </RadzenColumn>
+                                <RadzenColumn Size="6" class="rz-text-align-right">
+                                    <RadzenButton Text="Add Medication" Icon="add" ButtonStyle="ButtonStyle.Primary"
+                                                  Click="() => OpenMedAdminDialog()"/>
+                                </RadzenColumn>
+                            </RadzenRow>
+                            <RadzenDataGrid Data="@_medicalRecord.Administrations" TItem="MedicationAdministration"
+                                            AllowPaging="false" EmptyText="No medications have been administered.">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="MedicationAdministration" Property="MedicationName"
+                                                          Title="Medication"/>
+                                    <RadzenDataGridColumn TItem="MedicationAdministration" Property="DosageAdministered"
+                                                          Title="Dosage"/>
+                                    <RadzenDataGridColumn TItem="MedicationAdministration" Title="Actions"
+                                                          Sortable="false" Filterable="false"
+                                                          TextAlign="TextAlign.Center" Width="120px">
+                                        <Template Context="medAdmin">
+                                            <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="edit"
+                                                          Size="ButtonSize.Small"
+                                                          Click="@(() => OpenMedAdminDialog(medAdmin))"/>
+                                            <RadzenButton ButtonStyle="ButtonStyle.Danger" Shade="Shade.Lighter"
+                                                          Icon="delete" Size="ButtonSize.Small"
+                                                          Click="@(() => DeleteMedAdmin(medAdmin))"
+                                                          @onclick:stopPropagation="true"/>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                        </RadzenCard>
+                    </RadzenTabsItem>
+                }
+
+                @if (_medicalRecord.RequiresPrescription)
+                {
+                    <RadzenTabsItem Text="Prescriptions">
+                        <RadzenCard class="rz-mt-4">
+                            <RadzenRow JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center"
+                                       class="rz-mb-4">
+                                <RadzenColumn Size="6">
+                                    <RadzenText Text="Prescriptions" TextStyle="TextStyle.H5"/>
+                                </RadzenColumn>
+                                <RadzenColumn Size="6" class="rz-text-align-right">
+                                    <RadzenButton Text="Add Prescription" Icon="add" ButtonStyle="ButtonStyle.Primary"
+                                                  Click="() => OpenPrescriptionDialog()"/>
+                                </RadzenColumn>
+                            </RadzenRow>
+                            <RadzenDataGrid Data="@_medicalRecord.Prescriptions" TItem="Prescription"
+                                            AllowPaging="false" EmptyText="No prescriptions have been added.">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="Prescription" Property="MedicationName"
+                                                          Title="Medication"/>
+                                    <RadzenDataGridColumn TItem="Prescription" Property="Dosage" Title="Dosage"/>
+                                    <RadzenDataGridColumn TItem="Prescription" Property="Quantity" Title="Qty"/>
+                                    <RadzenDataGridColumn TItem="Prescription" Title="Actions" Sortable="false"
+                                                          Filterable="false" TextAlign="TextAlign.Center" Width="120px">
+                                        <Template Context="prescription">
+                                            <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="edit"
+                                                          Size="ButtonSize.Small"
+                                                          Click="@(() => OpenPrescriptionDialog(prescription))"/>
+                                            <RadzenButton ButtonStyle="ButtonStyle.Danger" Shade="Shade.Lighter"
+                                                          Icon="delete" Size="ButtonSize.Small"
+                                                          Click="@(() => DeletePrescription(prescription))"
+                                                          @onclick:stopPropagation="true"/>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                        </RadzenCard>
+                    </RadzenTabsItem>
+                }
+
+                @if (_medicalRecord.RequiresVaccination && _animal != null)
+                {
+                    <RadzenTabsItem Text="Vaccinations">
+                        <RadzenCard class="rz-mt-4">
+                            <RadzenRow JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center"
+                                       class="rz-mb-4">
+                                <RadzenColumn Size="6">
+                                    <RadzenText Text="Vaccinations" TextStyle="TextStyle.H5"/>
+                                </RadzenColumn>
+                                <RadzenColumn Size="6" class="rz-text-align-right">
+                                    <RadzenButton Text="Add Vaccination" Icon="add" ButtonStyle="ButtonStyle.Primary"
+                                                  Click="() => OpenVaccinationDialog()"/>
+                                </RadzenColumn>
+                            </RadzenRow>
+                            <RadzenDataGrid Data="@_animal.VaccinationRecords" TItem="VaccinationRecord"
+                                            AllowPaging="false" EmptyText="No vaccinations recorded.">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="VaccinationRecord" Property="VaccineName"
+                                                          Title="Vaccine"/>
+                                    <RadzenDataGridColumn TItem="VaccinationRecord" Property="BatchNumber"
+                                                          Title="Batch #"/>
+                                    <RadzenDataGridColumn TItem="VaccinationRecord" Title="Actions" Sortable="false"
+                                                          Filterable="false" TextAlign="TextAlign.Center" Width="120px">
+                                        <Template Context="vaccine">
+                                            <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="edit"
+                                                          Size="ButtonSize.Small"
+                                                          Click="@(() => OpenVaccinationDialog(vaccine))"/>
+                                            <RadzenButton ButtonStyle="ButtonStyle.Danger" Shade="Shade.Lighter"
+                                                          Icon="delete" Size="ButtonSize.Small"
+                                                          Click="@(() => DeleteVaccination(vaccine))"
+                                                          @onclick:stopPropagation="true"/>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                        </RadzenCard>
+                    </RadzenTabsItem>
+                }
+
+                @if (_medicalRecord.RequiresSurgery && _animal != null)
+                {
+                    <RadzenTabsItem Text="Surgical History">
+                        <RadzenCard class="rz-mt-4">
+                            <RadzenRow JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center"
+                                       class="rz-mb-4">
+                                <RadzenColumn Size="6">
+                                    <RadzenText Text="Surgical History for this Visit" TextStyle="TextStyle.H5"/>
+                                </RadzenColumn>
+                                <RadzenColumn Size="6" class="rz-text-align-right">
+                                    <RadzenButton Text="Add Surgery Record" Icon="add" ButtonStyle="ButtonStyle.Primary"
+                                                  Click="() => OpenSurgicalHistoryDialog()"/>
+                                </RadzenColumn>
+                            </RadzenRow>
+                            <RadzenDataGrid Data="@_medicalRecord.SurgicalHistories" TItem="SurgicalHistory"
+                                            AllowPaging="false" EmptyText="No surgical records for this visit.">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="SurgicalHistory" Property="ProcedureName"
+                                                          Title="Procedure"/>
+                                    <RadzenDataGridColumn TItem="SurgicalHistory" Property="SurgeryDate" Title="Date"
+                                                          FormatString="{0:d}"/>
+                                    <RadzenDataGridColumn TItem="SurgicalHistory" Property="Staff.FullName"
+                                                          Title="Surgeon"/>
+                                    <RadzenDataGridColumn TItem="SurgicalHistory" Title="Actions" Sortable="false"
+                                                          Filterable="false" TextAlign="TextAlign.Center" Width="120px">
+                                        <Template Context="surgery">
+                                            <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="edit"
+                                                          Size="ButtonSize.Small"
+                                                          Click="@(() => OpenSurgicalHistoryDialog(surgery))"/>
+                                            <RadzenButton ButtonStyle="ButtonStyle.Danger" Shade="Shade.Lighter"
+                                                          Icon="delete" Size="ButtonSize.Small"
+                                                          Click="@(() => DeleteSurgicalHistory(surgery))"
+                                                          @onclick:stopPropagation="true"/>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                        </RadzenCard>
+                    </RadzenTabsItem>
+                }
+            </Tabs>
+        </RadzenTabs>
+    }
+}
+
+@code {
+    [Parameter] public int AppointmentId { get; set; }
+
+    private Appointment? _appointment;
+    private MedicalRecord? _medicalRecord;
+    private Staff? _currentStaff;
+    private Animal? _animal;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authState.User);
+        if (user != null)
+        {
+            _currentStaff = await DbContext.Staff.FirstOrDefaultAsync(s => s.ApplicationUserId == user.Id);
+        }
+
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        // This single, comprehensive query fixes the data loading and UI refresh issues.
+        // By removing .AsNoTracking(), we ensure Entity Framework tracks all changes.
+        _appointment = await DbContext.Appointments
+            .AsNoTracking()
+            .Include(a => a.Client)
+            .Include(a => a.Animal).ThenInclude(p => p.VaccinationRecords).ThenInclude(vr => vr.Staff)
+            .Include(a => a.MedicalRecord).ThenInclude(mr => mr.Prescriptions)
+            .Include(a => a.MedicalRecord).ThenInclude(mr => mr.Administrations)
+            .Include(a => a.MedicalRecord).ThenInclude(mr => mr.SurgicalHistories).ThenInclude(sh => sh.Staff)
+            .FirstOrDefaultAsync(a => a.Id == AppointmentId);
+
+        if (_appointment != null)
+        {
+            _medicalRecord = _appointment.MedicalRecord;
+            _animal = _appointment.Animal;
+        }
+    }
+
+    private async Task StartMedicalRecord()
+    {
+        if (_appointment == null || _currentStaff == null) return;
+
+        var result = await DialogService.OpenAsync<AddMedicalRecordDialog>("Start New Medical Record", new Dictionary<string, object>());
+        if (result is MedicalRecord savedRecord)
+        {
+            savedRecord.StaffId = _currentStaff.Id;
+            savedRecord.RecordDate = DateTime.UtcNow;
+            savedRecord.Status = "Draft";
+            savedRecord.AnimalId = _appointment.AnimalId;
+            savedRecord.AppointmentId = _appointment.Id;
+
+            await DbContext.MedicalRecords.AddAsync(savedRecord);
+            await DbContext.SaveChangesAsync();
+
+            await LoadData();
+        }
+    }
+
+    private async Task EditSoapNotes()
+    {
+        if (_medicalRecord == null) return;
+        var recordToEdit = await DbContext.MedicalRecords.FindAsync(_medicalRecord.Id);
+        if (recordToEdit == null) return;
+
+        var result = await DialogService.OpenAsync<EditMedicalRecordDialog>("Edit SOAP Notes",
+            new Dictionary<string, object> { { "MedicalRecord", recordToEdit } });
+
+        if (result is MedicalRecord)
+        {
+            await DbContext.SaveChangesAsync();
+            await LoadData();
+        }
+    }
+
+    private async Task OpenPrescriptionDialog(Prescription? prescription = null)
+    {
+        if (_medicalRecord == null || _currentStaff == null) return;
+        var isEditMode = prescription != null;
+
+        if (isEditMode)
+        {
+            var model = new EditPrescriptionViewModel
+            {
+                Id = prescription!.Id,
+                InventoryItemId = prescription.InventoryItemId,
+                MedicationName = prescription.MedicationName,
+                Form = prescription.Form,
+                Dosage = prescription.Dosage,
+                Quantity = prescription.Quantity,
+                Instructions = prescription.Instructions
+            };
+
+            var result = await DialogService.OpenAsync<EditPrescriptionDialog>("Edit Prescription",
+                new Dictionary<string, object> { { "Model", model } });
+
+            if (result is EditPrescriptionViewModel returnedModel)
+            {
+                var prescriptionToUpdate = await DbContext.Prescriptions.FindAsync(returnedModel.Id);
+                if (prescriptionToUpdate != null)
+                {
+                    prescriptionToUpdate.InventoryItemId = returnedModel.InventoryItemId;
+                    prescriptionToUpdate.MedicationName = returnedModel.MedicationName;
+                    prescriptionToUpdate.Form = returnedModel.Form;
+                    prescriptionToUpdate.Dosage = returnedModel.Dosage;
+                    prescriptionToUpdate.Quantity = returnedModel.Quantity;
+                    prescriptionToUpdate.Instructions = returnedModel.Instructions;
+                    await DbContext.SaveChangesAsync();
+                    await LoadData();
+                }
+            }
+        }
+        else // Add Mode
+        {
+            var result = await DialogService.OpenAsync<AddPrescriptionDialog>("Add Prescription");
+
+            if (result is AddPrescriptionViewModel returnedModel)
+            {
+                var newPrescription = new Prescription
+                {
+                    MedicalRecordId = _medicalRecord.Id,
+                    AnimalId = _medicalRecord.AnimalId,
+                    StaffId = _currentStaff.Id,
+                    DatePrescribed = DateTime.UtcNow,
+                    InventoryItemId = returnedModel.InventoryItemId,
+                    MedicationName = returnedModel.MedicationName,
+                    Form = returnedModel.Form,
+                    Dosage = returnedModel.Dosage,
+                    Quantity = returnedModel.Quantity,
+                    Instructions = returnedModel.Instructions
+                };
+                await DbContext.Prescriptions.AddAsync(newPrescription);
+                await DbContext.SaveChangesAsync();
+                await LoadData();
+            }
+        }
+    }
+
+    private async Task DeletePrescription(Prescription prescription)
+    {
+        var confirmed = await DialogService.Confirm("Are you sure you want to delete this prescription?", "Confirm Deletion");
+        if (confirmed == true)
+        {
+            var prescriptionToDelete = await DbContext.Prescriptions.FindAsync(prescription.Id);
+            if (prescriptionToDelete != null)
+            {
+                DbContext.Prescriptions.Remove(prescriptionToDelete);
+                await DbContext.SaveChangesAsync();
+                await LoadData();
+            }
+        }
+    }
+
+    private async Task OpenMedAdminDialog(MedicationAdministration? medAdmin = null)
+    {
+        if (_medicalRecord == null || _currentStaff == null) return;
+        var isEditMode = medAdmin != null;
+
+        if (isEditMode)
+        {
+            var model = new EditMedicationAdminViewModel
+            {
+                Id = medAdmin!.Id,
+                InventoryItemId = medAdmin.InventoryItemId,
+                MedicationName = medAdmin.MedicationName,
+                DosageAdministered = medAdmin.DosageAdministered,
+                ServiceId = medAdmin.ServiceId
+            };
+            var result = await DialogService.OpenAsync<EditMedicationAdminDialog>("Edit Administered Medication", new Dictionary<string, object> { { "Model", model } });
+            if (result is EditMedicationAdminViewModel returnedModel)
+            {
+                var medAdminToUpdate = await DbContext.MedicationAdministrations.FindAsync(returnedModel.Id);
+                if (medAdminToUpdate != null)
+                {
+                    medAdminToUpdate.InventoryItemId = returnedModel.InventoryItemId;
+                    medAdminToUpdate.MedicationName = returnedModel.MedicationName;
+                    medAdminToUpdate.DosageAdministered = returnedModel.DosageAdministered;
+                    medAdminToUpdate.ServiceId = returnedModel.ServiceId!.Value;
+                    await DbContext.SaveChangesAsync();
+                    await LoadData();
+                }
+            }
+        }
+        else // Add Mode
+        {
+            var result = await DialogService.OpenAsync<AddMedicationAdminDialog>("Add Administered Medication");
+            if (result is AddMedicationAdminViewModel returnedModel)
+            {
+                var newMedAdmin = new MedicationAdministration
+                {
+                    MedicalRecordId = _medicalRecord.Id,
+                    StaffId = _currentStaff.Id,
+                    DateTimeAdministered = DateTime.UtcNow,
+                    InventoryItemId = returnedModel.InventoryItemId,
+                    MedicationName = returnedModel.MedicationName,
+                    DosageAdministered = returnedModel.DosageAdministered,
+                    ServiceId = returnedModel.ServiceId!.Value
+                };
+                await DbContext.MedicationAdministrations.AddAsync(newMedAdmin);
+                await DbContext.SaveChangesAsync();
+                await LoadData();
+            }
+        }
+    }
+
+    private async Task DeleteMedAdmin(MedicationAdministration medAdmin)
+    {
+        var confirmed = await DialogService.Confirm("Are you sure?", "Confirm Deletion");
+        if (confirmed == true)
+        {
+            var toDelete = await DbContext.MedicationAdministrations.FindAsync(medAdmin.Id);
+            if (toDelete != null)
+            {
+                DbContext.MedicationAdministrations.Remove(toDelete);
+                await DbContext.SaveChangesAsync();
+                await LoadData();
+            }
+        }
+    }
+
+    private async Task OpenVaccinationDialog(VaccinationRecord? vaccine = null)
+    {
+        if (_animal == null || _currentStaff == null) return;
+        var isEditMode = vaccine != null;
+
+        if (isEditMode)
+        {
+            var model = new EditVaccinationViewModel
+            {
+                Id = vaccine!.Id,
+                InventoryItemId = vaccine.InventoryItemId,
+                VaccineName = vaccine.VaccineName,
+                BatchNumber = vaccine.BatchNumber,
+                DateAdministered = vaccine.DateAdministered,
+                NextDueDate = vaccine.NextDueDate,
+                ServiceId = vaccine.ServiceId
+            };
+            var result = await DialogService.OpenAsync<EditVaccinationDialog>("Edit Vaccination", new Dictionary<string, object> { { "Model", model } });
+            if (result is EditVaccinationViewModel returnedModel)
+            {
+                var toUpdate = await DbContext.VaccinationRecords.FindAsync(returnedModel.Id);
+                if (toUpdate != null)
+                {
+                    toUpdate.InventoryItemId = returnedModel.InventoryItemId;
+                    toUpdate.VaccineName = returnedModel.VaccineName;
+                    toUpdate.BatchNumber = returnedModel.BatchNumber;
+                    toUpdate.DateAdministered = returnedModel.DateAdministered;
+                    toUpdate.NextDueDate = returnedModel.NextDueDate;
+                    toUpdate.ServiceId = returnedModel.ServiceId!.Value;
+                    await DbContext.SaveChangesAsync();
+                    await LoadData();
+                }
+            }
+        }
+        else // Add Mode
+        {
+            var result = await DialogService.OpenAsync<AddVaccinationDialog>("Add Vaccination");
+            if (result is AddVaccinationViewModel returnedModel)
+            {
+                var newVaccine = new VaccinationRecord
+                {
+                    AnimalId = _animal.Id,
+                    StaffId = _currentStaff.Id,
+                    DateAdministered = returnedModel.DateAdministered,
+                    NextDueDate = returnedModel.NextDueDate,
+                    BatchNumber = returnedModel.BatchNumber,
+                    InventoryItemId = returnedModel.InventoryItemId,
+                    VaccineName = returnedModel.VaccineName,
+                    ServiceId = returnedModel.ServiceId!.Value
+                };
+                await DbContext.VaccinationRecords.AddAsync(newVaccine);
+                await DbContext.SaveChangesAsync();
+                await LoadData();
+            }
+        }
+    }
+
+    private async Task DeleteVaccination(VaccinationRecord vaccine)
+    {
+        var confirmed = await DialogService.Confirm("Are you sure?", "Confirm Deletion");
+        if (confirmed == true)
+        {
+            var toDelete = await DbContext.VaccinationRecords.FindAsync(vaccine.Id);
+            if (toDelete != null)
+            {
+                DbContext.VaccinationRecords.Remove(toDelete);
+                await DbContext.SaveChangesAsync();
+                await LoadData();
+            }
+        }
+    }
+
+    private async Task OpenSurgicalHistoryDialog(SurgicalHistory? surgery = null)
+    {
+        if (_animal == null || _currentStaff == null || _medicalRecord == null) return;
+        var isEditMode = surgery != null;
+
+        if (isEditMode)
+        {
+            var model = new EditSurgicalHistoryViewModel
+            {
+                Id = surgery!.Id,
+                ServiceId = surgery.ServiceId,
+                ProcedureName = surgery.ProcedureName,
+                SurgeryDate = surgery.SurgeryDate,
+                Notes = surgery.Notes,
+                StaffId = surgery.StaffId
+            };
+            var result = await DialogService.OpenAsync<EditSurgicalHistoryDialog>("Edit Surgical Record", new Dictionary<string, object> { { "Model", model } });
+            if (result is EditSurgicalHistoryViewModel returnedModel)
+            {
+                var toUpdate = await DbContext.SurgicalHistories.FindAsync(returnedModel.Id);
+                if (toUpdate != null)
+                {
+                    toUpdate.ServiceId = returnedModel.ServiceId!.Value;
+                    toUpdate.ProcedureName = returnedModel.ProcedureName;
+                    toUpdate.SurgeryDate = returnedModel.SurgeryDate;
+                    toUpdate.Notes = returnedModel.Notes;
+                    toUpdate.StaffId = returnedModel.StaffId!.Value;
+                    await DbContext.SaveChangesAsync();
+                    await LoadData();
+                }
+            }
+        }
+        else // Add Mode
+        {
+            var result = await DialogService.OpenAsync<AddSurgicalHistoryDialog>("Add Surgical Record");
+            if (result is AddSurgicalHistoryViewModel returnedModel)
+            {
+                var newSurgery = new SurgicalHistory
+                {
+                    AnimalId = _animal.Id,
+                    MedicalRecordId = _medicalRecord.Id,
+                    ServiceId = returnedModel.ServiceId!.Value,
+                    ProcedureName = returnedModel.ProcedureName,
+                    SurgeryDate = returnedModel.SurgeryDate,
+                    Notes = returnedModel.Notes,
+                    StaffId = returnedModel.StaffId!.Value
+                };
+                await DbContext.SurgicalHistories.AddAsync(newSurgery);
+                await DbContext.SaveChangesAsync();
+                await LoadData();
+            }
+        }
+    }
+
+    private async Task DeleteSurgicalHistory(SurgicalHistory surgery)
+    {
+        var confirmed = await DialogService.Confirm("Are you sure?", "Confirm Deletion");
+        if (confirmed == true)
+        {
+            var toDelete = await DbContext.SurgicalHistories.FindAsync(surgery.Id);
+            if (toDelete != null)
+            {
+                DbContext.SurgicalHistories.Remove(toDelete);
+                await DbContext.SaveChangesAsync();
+                await LoadData();
+            }
+        }
+    }
+
+}

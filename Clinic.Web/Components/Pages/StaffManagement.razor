@@ -1,0 +1,106 @@
+@page "/staff-management"
+@using Clinic.Common
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin")]
+@inject ClinicDbContext DbContext
+@inject UserManager<ApplicationUser> UserManager
+
+<PageTitle>Staff Management</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Staff Management</h1>
+    <a href="/add-staff" class="btn btn-primary">Add New Staff</a>
+</div>
+
+<h3>Existing Staff</h3>
+@if (_staffList == null)
+{
+    <p><em>Loading staff...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+        <tr>
+            <th>First Name</th>
+            <th>Last Name</th>
+            <th>Assigned Role</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var staffMember in _staffList)
+        {
+            <tr>
+                <td>@staffMember.FirstName</td>
+                <td>@staffMember.LastName</td>
+                <td>@staffMember.Role</td>
+                <td>
+                    <a href="/edit-staff/@staffMember.Id" class="btn btn-sm btn-secondary">Edit</a>
+                    <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDelete(staffMember)">Delete</button>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@if (_staffToDelete != null)
+{
+    <div class="alert alert-danger mt-3">
+        <p>Are you sure you want to delete <strong>@_staffToDelete.FirstName @_staffToDelete.LastName</strong>?</p>
+        <p>This will also delete their login account and cannot be undone.</p>
+        <button class="btn btn-danger" @onclick="DeleteStaffConfirmed">Yes, Delete</button>
+        <button class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+    </div>
+}
+
+
+@code {
+    private List<Staff>? _staffList;
+    private Staff? _staffToDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _staffList = await DbContext.Staff.AsNoTracking().ToListAsync();
+    }
+
+    private void ConfirmDelete(Staff staff)
+    {
+        _staffToDelete = staff;
+    }
+
+    private void CancelDelete()
+    {
+        _staffToDelete = null;
+    }
+
+    private async Task DeleteStaffConfirmed()
+    {
+        if (_staffToDelete == null) return;
+
+        var user = await UserManager.FindByIdAsync(_staffToDelete.ApplicationUserId!);
+
+        DbContext.Staff.Remove(_staffToDelete);
+        if (user != null)
+        {
+            await UserManager.DeleteAsync(user);
+        }
+
+        await DbContext.SaveChangesAsync();
+
+        _staffToDelete = null;
+        await LoadData();
+    }
+
+}

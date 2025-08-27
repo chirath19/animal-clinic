@@ -1,0 +1,129 @@
+@page "/appointments"
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.Components.Shared
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin, Receptionist, Veterinarian")]
+@inject ClinicDbContext DbContext
+@inject NavigationManager NavigationManager
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+<PageTitle>Appointments</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Appointment Calendar</h1>
+</div>
+
+<RadzenScheduler @ref="scheduler" Data="@_appointmentList" TItem="Appointment"
+                 style="height: 75vh;"
+                 StartProperty="AppointmentDateTime" EndProperty="EndTime" TextProperty="Reason"
+                 SlotSelect="@OnSlotSelect" AppointmentSelect="@OnAppointmentSelect">
+    <RadzenDayView/>
+    <RadzenWeekView/>
+    <RadzenMonthView/>
+</RadzenScheduler>
+
+@code {
+    private RadzenScheduler<Appointment> scheduler = null!;
+    private List<Appointment> _appointmentList = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAppointments();
+    }
+
+    private async Task LoadAppointments()
+    {
+        _appointmentList = await DbContext.Appointments
+            .Include(a => a.Client)
+            .Include(a => a.Animal)
+            .Include(a => a.Staff)
+            .Include(a => a.MedicalRecord)
+            .Include(a => a.Service).ThenInclude(s => s.ServiceCategory)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    async Task OnSlotSelect(SchedulerSlotSelectEventArgs args)
+    {
+        var newAppointment = await DialogService.OpenAsync<AddAppointmentDialog>("Add Appointment",
+            new Dictionary<string, object> { { "Start", args.Start }, { "End", args.End } });
+
+        if (newAppointment != null)
+        {
+            await DbContext.Appointments.AddAsync(newAppointment);
+            await DbContext.SaveChangesAsync();
+            await LoadAppointments();
+            await scheduler.Reload();
+        }
+    }
+
+    async Task OnAppointmentSelect(SchedulerAppointmentSelectEventArgs<Appointment> args)
+    {
+        // This query fetches the full appointment details, solving the null reference error.
+        var fullAppointment = await DbContext.Appointments
+            .Include(a => a.Client)
+            .Include(a => a.Animal)
+            .Include(a => a.Staff)
+            .Include(a => a.MedicalRecord)
+            .Include(a => a.Service).ThenInclude(s => s.ServiceCategory)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == args.Data.Id);
+
+        if (fullAppointment != null)
+        {
+            // The dialog's only job is to show info and return a string for the next action
+            var result = await DialogService.OpenAsync<AppointmentDetails>($"Details for {fullAppointment.Animal.Name}",
+                new Dictionary<string, object>() { { "Appointment", fullAppointment } });
+
+            // The AppointmentDetails dialog now handles all navigation, so the switch statement is no longer needed here.
+        }
+    }
+
+    private async Task ManageMedicalRecord(Appointment appointment, int? medicalRecordId = null)
+    {
+        MedicalRecord record;
+        string dialogTitle;
+
+        if (medicalRecordId.HasValue)
+        {
+            dialogTitle = "Edit Medical Record";
+            record = await DbContext.MedicalRecords.FindAsync(medicalRecordId.Value);
+            if (record == null) return;
+
+            var result = await DialogService.OpenAsync<EditMedicalRecordDialog>(dialogTitle,
+                new Dictionary<string, object> { { "MedicalRecord", record } });
+
+            if (result is MedicalRecord)
+            {
+                await DbContext.SaveChangesAsync();
+                await LoadAppointments();
+            }
+        }
+        else
+        {
+            dialogTitle = "New Medical Record";
+            record = new MedicalRecord { AnimalId = appointment.AnimalId, AppointmentId = appointment.Id };
+
+            var result = await DialogService.OpenAsync<AddMedicalRecordDialog>(dialogTitle,
+                new Dictionary<string, object> { { "MedicalRecord", record } });
+
+            if (result is MedicalRecord savedRecord)
+            {
+                var staff = await DbContext.Staff.FirstOrDefaultAsync(s => s.Role == "Veterinarian"); // Simplification
+                if (staff != null) savedRecord.StaffId = staff.Id;
+
+                savedRecord.RecordDate = DateTime.UtcNow;
+                savedRecord.Status = "Draft";
+
+                await DbContext.MedicalRecords.AddAsync(savedRecord);
+                await DbContext.SaveChangesAsync();
+                await LoadAppointments();
+            }
+        }
+    }
+
+}

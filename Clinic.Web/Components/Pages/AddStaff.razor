@@ -1,0 +1,108 @@
+@page "/add-staff"
+@using Clinic.Common
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.ViewModels
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin")]
+@inject ClinicDbContext DbContext
+@inject UserManager<ApplicationUser> UserManager
+@inject RoleManager<IdentityRole> RoleManager
+@inject NavigationManager NavigationManager
+
+<PageTitle>Add New Staff</PageTitle>
+
+<h1>Add New Staff Member</h1>
+
+<EditForm Model="_staffModel" OnValidSubmit="HandleRegistration" FormName="RegisterStaff">
+    <DataAnnotationsValidator/>
+    <ValidationSummary/>
+
+    <div class="mb-3">
+        <label class="form-label">First Name</label>
+        <InputText class="form-control" @bind-Value="_staffModel.FirstName"/>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Last Name</label>
+        <InputText class="form-control" @bind-Value="_staffModel.LastName"/>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Email</label>
+        <InputText class="form-control" @bind-Value="_staffModel.Email"/>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Initial Password</label>
+        <InputText type="password" class="form-control" @bind-Value="_staffModel.Password"/>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Assign Role</label>
+        <InputSelect class="form-select" @bind-Value="_staffModel.Role">
+            @foreach (var role in _roleList)
+            {
+                <option value="@role">@role</option>
+            }
+        </InputSelect>
+    </div>
+    <button type="submit" class="btn btn-primary">Register Staff</button>
+    <a href="/staff-management" class="btn btn-secondary">Cancel</a>
+</EditForm>
+
+
+@code {
+    private List<string> _roleList = new();
+    private readonly StaffRegistrationViewModel _staffModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _roleList = await RoleManager.Roles
+            .Where(r => r.Name != "Client")
+            .Select(r => r.Name!)
+            .ToListAsync();
+
+        // Set a default role if the list is not empty
+        _staffModel.Role = _roleList.FirstOrDefault() ?? string.Empty;
+    }
+
+    private async Task HandleRegistration()
+    {
+        var existingUser = await UserManager.FindByEmailAsync(_staffModel.Email);
+        if (existingUser != null)
+        {
+            // Optionally, add an error message for the user here
+            return;
+        }
+
+        var newUser = new ApplicationUser
+        {
+            FirstName = _staffModel.FirstName,
+            LastName = _staffModel.LastName,
+            UserName = _staffModel.Email,
+            Email = _staffModel.Email,
+            EmailConfirmed = true
+        };
+
+        var result = await UserManager.CreateAsync(newUser, _staffModel.Password);
+
+        if (result.Succeeded)
+        {
+            await UserManager.AddToRoleAsync(newUser, _staffModel.Role);
+
+            var newStaff = new Staff
+            {
+                FirstName = newUser.FirstName,
+                LastName = newUser.LastName,
+                Role = _staffModel.Role,
+                ApplicationUserId = newUser.Id
+            };
+            DbContext.Staff.Add(newStaff);
+            await DbContext.SaveChangesAsync();
+
+            NavigationManager.NavigateTo("/staff-management");
+        }
+        // Handle UserManager errors (e.g., password not strong enough)
+    }
+
+}

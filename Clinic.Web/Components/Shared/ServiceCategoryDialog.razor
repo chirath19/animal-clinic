@@ -1,0 +1,28 @@
+@using Clinic.Web.ViewModels
+@inject DialogService DialogService
+
+<RadzenTemplateForm TItem="ServiceCategoryViewModel" Data="@Model" Submit="@OnSubmit">
+    <DataAnnotationsValidator/>
+    <RadzenStack Gap="1.5rem">
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Category Name" Component="Name"/>
+            <RadzenTextBox @bind-Value="@Model.Name" Name="Name" Style="width: 100%;"/>
+            <RadzenRequiredValidator Component="Name" Text="Category name is required"/>
+        </RadzenStack>
+    </RadzenStack>
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem" Class="rz-mt-4">
+        <RadzenButton ButtonType="ButtonType.Submit" Text="Save"/>
+        <RadzenButton Text="Cancel" Click="@(() => DialogService.Close(null))" ButtonStyle="ButtonStyle.Light"/>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter] public ServiceCategoryViewModel Model { get; set; } = new();
+
+    private void OnSubmit(ServiceCategoryViewModel model)
+    {
+        DialogService.Close(model);
+    }
+
+}

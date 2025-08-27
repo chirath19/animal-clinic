@@ -1,0 +1,113 @@
+@page "/edit-pet/{PetId:int}"
+@using Clinic.Common
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.ViewModels
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject ClinicDbContext DbContext
+@attribute [Authorize]
+
+<PageTitle>Edit Pet</PageTitle>
+
+<h1>Edit Pet</h1>
+
+@if (_petFormModel == null)
+{
+    <p><em>Loading pet details...</em></p>
+}
+else
+{
+    <EditForm Model="@_petFormModel" OnValidSubmit="HandleValidSubmit" FormName="EditPetForm">
+        <DataAnnotationsValidator/>
+
+        <div class="mb-3">
+            <label for="name" class="form-label">Name:</label>
+            <InputText id="name" class="form-control" @bind-Value="_petFormModel.Name"/>
+        </div>
+
+        <div class="mb-3">
+            <label for="species" class="form-label">Species:</label>
+            <InputText id="species" class="form-control" @bind-Value="_petFormModel.Species"/>
+        </div>
+
+        <div class="mb-3">
+            <label for="breed" class="form-label">Breed:</label>
+            <InputText id="breed" class="form-control" @bind-Value="_petFormModel.Breed"/>
+        </div>
+
+        <div class="mb-3">
+            <label for="dob" class="form-label">Date of Birth:</label>
+            <InputDate id="dob" class="form-control" @bind-Value="_petFormModel.DateOfBirth"/>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Update Pet</button>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int PetId { get; set; }
+
+    private EditPetViewModel? _petFormModel;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authState.User);
+
+        if (user != null)
+        {
+            var client = await DbContext.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ApplicationUserId == user.Id);
+            if (client != null)
+            {
+                var animal = await DbContext.Animals
+                    .FirstOrDefaultAsync(a => a.Id == PetId && a.ClientId == client.Id);
+
+                if (animal != null)
+                {
+                    // Map the database entity to our form's ViewModel
+                    _petFormModel = new EditPetViewModel
+                    {
+                        Id = animal.Id,
+                        Name = animal.Name,
+                        Species = animal.Species,
+                        Breed = animal.Breed,
+                        DateOfBirth = animal.DateOfBirth
+                    };
+                }
+            }
+        }
+
+        if (_petFormModel == null)
+        {
+            NavigationManager.NavigateTo("/dashboard", true);
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (_petFormModel != null)
+        {
+            // Find the original animal in the database to update it
+            var animalToUpdate = await DbContext.Animals.FindAsync(_petFormModel.Id);
+            if (animalToUpdate != null)
+            {
+                // Map the changes from the form back to the database entity
+                animalToUpdate.Name = _petFormModel.Name;
+                animalToUpdate.Species = _petFormModel.Species;
+                animalToUpdate.Breed = _petFormModel.Breed;
+                animalToUpdate.DateOfBirth = _petFormModel.DateOfBirth;
+
+                await DbContext.SaveChangesAsync();
+            }
+
+            NavigationManager.NavigateTo("/dashboard");
+        }
+    }
+
+}

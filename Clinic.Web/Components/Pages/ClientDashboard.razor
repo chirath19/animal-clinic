@@ -1,0 +1,100 @@
+@page "/dashboard"
+@using Clinic.Common
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject ClinicDbContext DbContext
+@attribute [Authorize]
+
+<PageTitle>My Dashboard</PageTitle>
+
+<h1>Client Dashboard</h1>
+
+@if (_client == null)
+{
+    <p><em>Loading your information...</em></p>
+}
+else
+{
+    <div class="card mb-4">
+        <div class="card-header">
+            My Details
+        </div>
+        <div class="card-body">
+            <h5 class="card-title">@_client.FirstName @_client.LastName</h5>
+            <p class="card-text"><strong>Email:</strong> @_client.Email</p>
+            <p class="card-text"><strong>Phone:</strong> @_client.PhoneNumber</p>
+            <p class="card-text"><strong>Address:</strong> @_client.Address</p>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <a href="/add-pet" class="btn btn-primary">Add New Pet</a>
+    </div>
+
+    <h3>My Pets</h3>
+    @if (!_client.Animals.Any())
+    {
+        <p>You have not registered any pets yet.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Name</th>
+                <th>Species</th>
+                <th>Breed</th>
+                <th>Date of Birth</th>
+                <th>Actions</th> @* <-- ADD THIS HEADER *@
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var animal in _client.Animals)
+            {
+                <tr>
+                    <td>@animal.Name</td>
+                    <td>@animal.Species</td>
+                    <td>@animal.Breed</td>
+                    <td>@animal.DateOfBirth.ToShortDateString()</td>
+                    @* 👇 START: ADD THIS TABLE CELL *@
+                    <td>
+                        <a href="/edit-pet/@animal.Id" class="btn btn-sm btn-secondary">Edit</a>
+                    </td>
+                    @* 👆 END: ADD THIS TABLE CELL *@
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    private Client? _client;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 1. Get the authentication state to find the current user
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity is { IsAuthenticated: true })
+        {
+            // 2. Get the full ApplicationUser object
+            var currentUser = await UserManager.GetUserAsync(user);
+            if (currentUser != null)
+            {
+                // 3. Find the associated Client record, including their Animals
+                _client = await DbContext.Clients
+                    .Include(c => c.Animals) // Eagerly load the Animals
+                    .FirstOrDefaultAsync(c => c.ApplicationUserId == currentUser.Id);
+            }
+        }
+    }
+
+}

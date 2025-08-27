@@ -1,0 +1,42 @@
+@using Clinic.Domain.Entities
+@inject DialogService DialogService
+
+<RadzenTemplateForm TItem="Supplier" Data="@Supplier" Submit="@OnSubmit">
+    <RadzenStack Gap="1.5rem">
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Supplier Name" Component="Name"/>
+            <RadzenTextBox @bind-Value="@Supplier.Name" Name="Name" Style="width: 100%;"/>
+            <RadzenRequiredValidator Component="Name" Text="Supplier name is required"/>
+        </RadzenStack>
+
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Contact Person" Component="ContactPerson"/>
+            <RadzenTextBox @bind-Value="@Supplier.ContactPerson" Name="ContactPerson" Style="width: 100%;"/>
+        </RadzenStack>
+
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Email" Component="Email"/>
+            <RadzenTextBox @bind-Value="@Supplier.Email" Name="Email" Style="width: 100%;"/>
+        </RadzenStack>
+
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Phone Number" Component="PhoneNumber"/>
+            <RadzenTextBox @bind-Value="@Supplier.PhoneNumber" Name="PhoneNumber" Style="width: 100%;"/>
+        </RadzenStack>
+    </RadzenStack>
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem" Class="rz-mt-4">
+        <RadzenButton ButtonType="ButtonType.Submit" Text="Save"/>
+        <RadzenButton Text="Cancel" Click="@(() => DialogService.Close(null))" ButtonStyle="ButtonStyle.Light"/>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter] public Supplier Supplier { get; set; } = new();
+
+    private void OnSubmit(Supplier supplier)
+    {
+        DialogService.Close(supplier);
+    }
+
+}

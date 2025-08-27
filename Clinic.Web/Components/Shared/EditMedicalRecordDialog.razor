@@ -1,0 +1,79 @@
+@using Clinic.Domain.Entities
+@using Clinic.Web.ViewModels
+@inject DialogService DialogService
+
+<RadzenTemplateForm TItem="EditMedicalRecordViewModel" Data="@_model" Submit="@OnSave">
+    <DataAnnotationsValidator/>
+    <RadzenStack Gap="1.5rem" class="rz-p-4">
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Subjective"/>
+            <RadzenTextArea @bind-Value="@_model.Subjective" Rows="3" Style="width: 100%;"/>
+        </RadzenStack>
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Objective"/>
+            <RadzenTextArea @bind-Value="@_model.Objective" Rows="3" Style="width: 100%;"/>
+        </RadzenStack>
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Assessment (Diagnosis)" Component="Assessment"/>
+            <RadzenTextArea @bind-Value="@_model.Assessment" Name="Assessment" Rows="3" Style="width: 100%;"/>
+            <RadzenRequiredValidator Component="Assessment" Text="An assessment is required."/>
+        </RadzenStack>
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Plan"/>
+            <RadzenTextArea @bind-Value="@_model.Plan" Rows="3" Style="width: 100%;"/>
+        </RadzenStack>
+
+        <hr/>
+        <RadzenText Text="Visit Includes:" TextStyle="TextStyle.H6"/>
+        <RadzenFieldset>
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem"
+                         Wrap="FlexWrap.Wrap">
+                <RadzenCheckBox @bind-Value="@_model.RequiresPrescription" TValue="bool" Disabled="true"/>
+                <RadzenLabel Text="Prescription"/>
+                <RadzenCheckBox @bind-Value="@_model.RequiresMedicationAdmin" TValue="bool" Disabled="true"/>
+                <RadzenLabel Text="In-Clinic Medication"/>
+                <RadzenCheckBox @bind-Value="@_model.RequiresVaccination" TValue="bool" Disabled="true"/>
+                <RadzenLabel Text="Vaccination"/>
+                <RadzenCheckBox @bind-Value="@_model.RequiresSurgery" TValue="bool" Disabled="true"/>
+                <RadzenLabel Text="Surgery"/>
+            </RadzenStack>
+        </RadzenFieldset>
+    </RadzenStack>
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem" Class="rz-p-4">
+        <RadzenButton ButtonType="ButtonType.Submit" Text="Update Record"/>
+        <RadzenButton Text="Cancel" Click="@(() => DialogService.Close(null))" ButtonStyle="ButtonStyle.Light"/>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter] public MedicalRecord MedicalRecord { get; set; } = null!;
+
+    private readonly EditMedicalRecordViewModel _model = new();
+
+    protected override void OnInitialized()
+    {
+        _model.Id = MedicalRecord.Id;
+        _model.Subjective = MedicalRecord.Subjective;
+        _model.Objective = MedicalRecord.Objective;
+        _model.Assessment = MedicalRecord.Assessment;
+        _model.Plan = MedicalRecord.Plan;
+        _model.RequiresPrescription = MedicalRecord.RequiresPrescription;
+        _model.RequiresVaccination = MedicalRecord.RequiresVaccination;
+        _model.RequiresMedicationAdmin = MedicalRecord.RequiresMedicationAdmin;
+        _model.RequiresSurgery = MedicalRecord.RequiresSurgery; // Add this line
+    }
+
+    private void OnSave(EditMedicalRecordViewModel viewModel)
+    {
+        MedicalRecord.Subjective = viewModel.Subjective;
+        MedicalRecord.Objective = viewModel.Objective;
+        MedicalRecord.Assessment = viewModel.Assessment;
+        MedicalRecord.Plan = viewModel.Plan;
+
+        // The 'Requires' flags are not editable, so we don't map them back.
+
+        DialogService.Close(MedicalRecord);
+    }
+
+}

@@ -1,0 +1,29 @@
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Microsoft.EntityFrameworkCore
+@inject ClinicDbContext DbContext
+@inject DialogService DialogService
+
+<RadzenStack Gap="1.5rem">
+    <RadzenDropDown Data="@_suppliers" TValue="Supplier" TextProperty="Name" Placeholder="Select a supplier..."
+                    Style="width: 100%;" Change="@(args => OnChange(args))"/>
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem">
+        <RadzenButton Text="Cancel" Click="@(() => DialogService.Close(null))" ButtonStyle="ButtonStyle.Light"/>
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    private List<Supplier> _suppliers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _suppliers = await DbContext.Suppliers.AsNoTracking().ToListAsync();
+    }
+
+    private void OnChange(object value)
+    {
+        DialogService.Close(value as Supplier);
+    }
+
+}

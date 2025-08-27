@@ -1,0 +1,108 @@
+@page "/add-pet"
+@using Clinic.Common
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.ViewModels
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject ClinicDbContext DbContext
+@attribute [Authorize]
+
+<PageTitle>Add a New Pet</PageTitle>
+
+<h1>Add a New Pet</h1>
+
+@if (_petFormModel is not null)
+{
+    <EditForm Model="@_petFormModel" OnValidSubmit="HandleValidSubmit" FormName="AddPetForm">
+        <DataAnnotationsValidator/>
+        <ValidationSummary class="text-danger"/>
+
+        <div class="mb-3">
+            <label for="name" class="form-label">Name:</label>
+            @* We are changing this input to manually handle the 'oninput' event *@
+            <input id="name" class="form-control" value="@_petFormModel.Name" @oninput="LogNameValue"/>
+            <ValidationMessage For="() => _petFormModel.Name" class="text-danger"/>
+        </div>
+
+        <div class="mb-3">
+            <label for="species" class="form-label">Species (e.g., Dog, Cat):</label>
+            <InputText id="species" class="form-control" @bind-Value="_petFormModel.Species"/>
+            <ValidationMessage For="() => _petFormModel.Species" class="text-danger"/>
+        </div>
+
+        <div class="mb-3">
+            <label for="breed" class="form-label">Breed:</label>
+            <InputText id="breed" class="form-control" @bind-Value="_petFormModel.Breed"/>
+            <ValidationMessage For="() => _petFormModel.Breed" class="text-danger"/>
+        </div>
+
+        <div class="mb-3">
+            <label for="dob" class="form-label">Date of Birth:</label>
+            <InputDate id="dob" class="form-control" @bind-Value="_petFormModel.DateOfBirth"/>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save Pet</button>
+    </EditForm>
+}
+
+@code {
+    private AddPetViewModel? _petFormModel;
+
+    protected override void OnInitialized()
+    {
+        _petFormModel = new AddPetViewModel();
+    }
+
+    // This new method will be called for every character typed in the "Name" box
+    private async Task LogNameValue(ChangeEventArgs e)
+    {
+        var currentValue = e.Value?.ToString();
+
+        // Update the C# model manually
+        if (_petFormModel is not null)
+        {
+            _petFormModel.Name = currentValue ?? string.Empty;
+        }
+
+        // Log the value to the browser's developer console
+        await JSRuntime.InvokeVoidAsync("console.log", $"Name input value: {currentValue}");
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authState.User);
+
+        if (user != null && _petFormModel is not null)
+        {
+            // Log the model state right before saving
+            await JSRuntime.InvokeVoidAsync("console.log", "Submit button clicked. Model state:", _petFormModel);
+
+            var client = await DbContext.Clients.FirstOrDefaultAsync(c => c.ApplicationUserId == user.Id);
+            if (client != null)
+            {
+                var newAnimal = new Animal
+                {
+                    Name = _petFormModel.Name,
+                    Species = _petFormModel.Species,
+                    Breed = _petFormModel.Breed,
+                    DateOfBirth = _petFormModel.DateOfBirth,
+                    ClientId = client.Id
+                };
+
+                DbContext.Animals.Add(newAnimal);
+                await DbContext.SaveChangesAsync();
+                NavigationManager.NavigateTo("/dashboard");
+            }
+        }
+    }
+
+}

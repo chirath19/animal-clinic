@@ -1,0 +1,72 @@
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.ViewModels
+@using Microsoft.EntityFrameworkCore
+@inject ClinicDbContext DbContext
+@inject DialogService DialogService
+
+<RadzenTemplateForm TItem="AddSurgicalHistoryViewModel" Data="@_model" Submit="@OnSubmit">
+    <DataAnnotationsValidator/>
+    <RadzenStack Gap="1.5rem">
+        <RadzenFieldset Text="Surgical Details">
+            <RadzenStack Gap="1rem">
+                <RadzenLabel Text="Surgical Service Category" Component="ServiceId"/>
+                <RadzenDropDown AllowFiltering="true" Data="@_surgicalServices" TValue="int?"
+                                Placeholder="Select a surgical service..." @bind-Value="@_model.ServiceId"
+                                Style="width:100%;" Name="ServiceId"
+                                TextProperty="Name" ValueProperty="Id"/>
+                <RadzenRequiredValidator Component="ServiceId" Text="Please select a service category"/>
+
+                <RadzenLabel Text="Specific Procedure Name" Component="ProcedureName"/>
+                <RadzenTextBox @bind-Value="@_model.ProcedureName" Placeholder="e.g., Spay, Tumor Removal..."
+                               Style="width: 100%;" Name="ProcedureName"/>
+                <RadzenRequiredValidator Component="ProcedureName" Text="Procedure name is required"/>
+
+                <RadzenDatePicker @bind-Value="@_model.SurgeryDate" DateFormat="d" Placeholder="Surgery Date"
+                                  Style="width: 100%;"/>
+
+                <RadzenDropDown AllowFiltering="true" Data="@_surgeons" TValue="int?"
+                                Placeholder="Select a surgeon..." @bind-Value="@_model.StaffId"
+                                Style="width:100%;" Name="Surgeon"
+                                TextProperty="FullName" ValueProperty="Id"/>
+                <RadzenRequiredValidator Component="Surgeon" Text="Please select a surgeon"/>
+            </RadzenStack>
+        </RadzenFieldset>
+
+        <RadzenFieldset Text="Notes">
+            <RadzenTextArea @bind-Value="@_model.Notes"
+                            Placeholder="Enter any notes about the outcome, complications, etc." Style="width: 100%;"
+                            Rows="4"/>
+        </RadzenFieldset>
+    </RadzenStack>
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem" Class="rz-mt-4">
+        <RadzenButton ButtonType="ButtonType.Submit" Text="Add Record"/>
+        <RadzenButton Text="Cancel" Click="@(() => DialogService.Close(null))" ButtonStyle="ButtonStyle.Light"/>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    private readonly AddSurgicalHistoryViewModel _model = new();
+    private List<Staff> _surgeons = new();
+    private List<Service> _surgicalServices = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _surgeons = await DbContext.Staff
+            .Where(s => s.Role == "Surgeon" || s.Role == "Admin" || s.Role == "Veterinarian")
+            .AsNoTracking()
+            .ToListAsync();
+
+        _surgicalServices = await DbContext.Services
+            .Where(s => s.ServiceCategory.Name == "Surgical Procedure")
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    private void OnSubmit(AddSurgicalHistoryViewModel model)
+    {
+        DialogService.Close(model);
+    }
+
+}

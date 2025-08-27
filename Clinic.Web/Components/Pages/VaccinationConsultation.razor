@@ -1,0 +1,186 @@
+@page "/vaccination-consultation/{AppointmentId:int}"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin, Veterinarian, Receptionist")]
+
+@using Clinic.Domain.Entities
+@using Clinic.Common
+@using Clinic.Web.ViewModels
+@using Clinic.Web.Components.Shared
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject Clinic.Infrastructure.Persistence.ClinicDbContext DbContext
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+<PageTitle>Vaccination</PageTitle>
+
+@if (_appointment == null || _animal == null)
+{
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate"/>
+}
+else
+{
+    <RadzenCard class="rz-mb-4">
+        <RadzenRow AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+            <RadzenColumn Size="8">
+                <RadzenText Text="@($"Vaccination for {_appointment.Animal.Name}")" TextStyle="TextStyle.H5"
+                            TagName="TagName.H2"/>
+                <RadzenText
+                    Text="@($"Client: {_appointment.Client.FirstName} {_appointment.Client.LastName} | Time: {_appointment.AppointmentDateTime:t}")"
+                    TextStyle="TextStyle.Subtitle1"/>
+            </RadzenColumn>
+            <RadzenColumn Size="4" class="rz-text-align-right">
+                <RadzenButton Text="Back to Calendar" Click="@(() => NavigationManager.NavigateTo("/appointments"))"
+                              Icon="arrow_back" ButtonStyle="ButtonStyle.Secondary"/>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenCard>
+
+    <RadzenCard>
+        <RadzenRow JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center" class="rz-mb-4">
+            <RadzenColumn Size="6">
+                <RadzenText Text="Vaccination History" TextStyle="TextStyle.H5"/>
+            </RadzenColumn>
+            <RadzenColumn Size="6" class="rz-text-align-right">
+                <RadzenButton Text="Add Vaccination" Icon="add" ButtonStyle="ButtonStyle.Primary"
+                              Click="() => OpenVaccinationDialog()"/>
+            </RadzenColumn>
+        </RadzenRow>
+        <RadzenDataGrid Data="@_animal.VaccinationRecords" TItem="VaccinationRecord" AllowPaging="false"
+                        EmptyText="No vaccinations recorded.">
+            <Columns>
+                <RadzenDataGridColumn TItem="VaccinationRecord" Property="VaccineName" Title="Vaccine"/>
+                <RadzenDataGridColumn TItem="VaccinationRecord" Property="DateAdministered" Title="Date Given"
+                                      FormatString="{0:d}"/>
+                <RadzenDataGridColumn TItem="VaccinationRecord" Property="NextDueDate" Title="Next Due"
+                                      FormatString="{0:d}"/>
+                <RadzenDataGridColumn TItem="VaccinationRecord" Title="Actions" Sortable="false" Filterable="false"
+                                      TextAlign="TextAlign.Center" Width="120px">
+                    <Template Context="vaccine">
+                        <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="edit" Size="ButtonSize.Small"
+                                      Click="@(() => OpenVaccinationDialog(vaccine))"/>
+                        <RadzenButton ButtonStyle="ButtonStyle.Danger" Shade="Shade.Lighter" Icon="delete"
+                                      Size="ButtonSize.Small" Click="@(() => DeleteVaccination(vaccine))"
+                                      @onclick:stopPropagation="true"/>
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </RadzenCard>
+}
+
+@code {
+    [Parameter] public int AppointmentId { get; set; }
+
+    private Appointment? _appointment;
+    private Staff? _currentStaff;
+    private Animal? _animal;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authState.User);
+        if (user != null)
+        {
+            _currentStaff = await DbContext.Staff.FirstOrDefaultAsync(s => s.ApplicationUserId == user.Id);
+        }
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        
+        _appointment = await DbContext.Appointments
+            .AsNoTracking()
+            .Include(a => a.Client)
+            .Include(a => a.Animal).ThenInclude(p => p.VaccinationRecords)
+            .FirstOrDefaultAsync(a => a.Id == AppointmentId);
+
+        if (_appointment != null)
+        {
+            _animal = _appointment.Animal;
+        }
+    }
+
+    private async Task OpenVaccinationDialog(VaccinationRecord? vaccine = null)
+    {
+        if (_animal == null || _currentStaff == null)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Cannot process request. User or pet data is missing.");
+            return;
+        }
+        
+        var isEditMode = vaccine != null;
+
+        if (isEditMode)
+        {
+            var model = new EditVaccinationViewModel
+            {
+                Id = vaccine!.Id,
+                InventoryItemId = vaccine.InventoryItemId,
+                VaccineName = vaccine.VaccineName,
+                BatchNumber = vaccine.BatchNumber,
+                DateAdministered = vaccine.DateAdministered,
+                NextDueDate = vaccine.NextDueDate,
+                ServiceId = vaccine.ServiceId
+            };
+            var result = await DialogService.OpenAsync<EditVaccinationDialog>("Edit Vaccination", new Dictionary<string, object> { { "Model", model } });
+            if (result is EditVaccinationViewModel returnedModel)
+            {
+                var toUpdate = await DbContext.VaccinationRecords.FindAsync(returnedModel.Id);
+                if (toUpdate != null)
+                {
+                    toUpdate.InventoryItemId = returnedModel.InventoryItemId;
+                    toUpdate.VaccineName = returnedModel.VaccineName;
+                    toUpdate.BatchNumber = returnedModel.BatchNumber;
+                    toUpdate.DateAdministered = returnedModel.DateAdministered;
+                    toUpdate.NextDueDate = returnedModel.NextDueDate;
+                    toUpdate.ServiceId = returnedModel.ServiceId!.Value;
+                    
+                    await DbContext.SaveChangesAsync();
+                    await LoadData();
+                }
+            }
+        }
+        else // Add Mode
+        {
+            var result = await DialogService.OpenAsync<AddVaccinationDialog>("Add Vaccination");
+            if (result is AddVaccinationViewModel returnedModel)
+            {
+                var newVaccine = new VaccinationRecord
+                {
+                    AnimalId = _animal.Id,
+                    StaffId = _currentStaff.Id,
+                    DateAdministered = returnedModel.DateAdministered,
+                    NextDueDate = returnedModel.NextDueDate,
+                    BatchNumber = returnedModel.BatchNumber,
+                    InventoryItemId = returnedModel.InventoryItemId,
+                    VaccineName = returnedModel.VaccineName,
+                    ServiceId = returnedModel.ServiceId!.Value
+                };
+                await DbContext.VaccinationRecords.AddAsync(newVaccine);
+                await DbContext.SaveChangesAsync();
+                await LoadData();
+            }
+        }
+    }
+
+    private async Task DeleteVaccination(VaccinationRecord vaccine)
+    {
+        var confirmed = await DialogService.Confirm("Are you sure?", "Confirm Deletion");
+        if (confirmed == true)
+        {
+            var toDelete = await DbContext.VaccinationRecords.FindAsync(vaccine.Id);
+            if (toDelete != null)
+            {
+                DbContext.VaccinationRecords.Remove(toDelete);
+                await DbContext.SaveChangesAsync();
+                await LoadData();
+            }
+        }
+    }
+}

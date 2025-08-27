@@ -1,0 +1,99 @@
+@page "/invoice-details/{InvoiceId:int}"
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin, Receptionist")]
+@inject ClinicDbContext DbContext
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Invoice Details</PageTitle>
+
+@if (_invoice == null)
+{
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate"/>
+}
+else
+{
+    <RadzenCard>
+        <RadzenRow AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
+            <RadzenColumn Size="6">
+                <RadzenText Text="@($"Invoice #{_invoice.Id}")" TextStyle="TextStyle.H4" TagName="TagName.H2"/>
+                <RadzenText Text="@($"For: {_invoice.Client.FirstName} {_invoice.Client.LastName}")"
+                            TextStyle="TextStyle.Subtitle1"/>
+                <RadzenText Text="@($"Date: {_invoice.InvoiceDate:D}")" TextStyle="TextStyle.Body2"/>
+            </RadzenColumn>
+            <RadzenColumn Size="6" class="rz-text-align-right no-print">
+                @* This button will be hidden when printing *@
+                <RadzenButton Text="Print Invoice" Click="PrintInvoice" Icon="print" ButtonStyle="ButtonStyle.Primary"
+                              class="rz-me-2"/>
+                <RadzenButton Text="Back to Invoices" Click="@(() => NavigationManager.NavigateTo("/invoices"))"
+                              Icon="arrow_back" ButtonStyle="ButtonStyle.Secondary"/>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenDataGrid Data="@_invoice.InvoiceItems" TItem="InvoiceItem" AllowPaging="false">
+            <Columns>
+                <RadzenDataGridColumn TItem="InvoiceItem" Property="Description" Title="Description"/>
+                <RadzenDataGridColumn TItem="InvoiceItem" Property="Quantity" Title="Qty" Width="80px"
+                                      TextAlign="TextAlign.Center"/>
+                <RadzenDataGridColumn TItem="InvoiceItem" Property="UnitPrice" Title="Unit Price" FormatString="{0:C}"
+                                      Width="140px" TextAlign="TextAlign.Right"/>
+                <RadzenDataGridColumn TItem="InvoiceItem" Property="TotalPrice" Title="Total" FormatString="{0:C}"
+                                      Width="140px" TextAlign="TextAlign.Right"/>
+            </Columns>
+        </RadzenDataGrid>
+
+        <RadzenStack AlignItems="AlignItems.End" class="rz-mt-4">
+            <RadzenRow>
+                <RadzenColumn>
+                    <RadzenText TextStyle="TextStyle.Subtitle1">Total:</RadzenText>
+                </RadzenColumn>
+                <RadzenColumn>
+                    <RadzenText TextStyle="TextStyle.Subtitle1">@_invoice.TotalAmount.ToString("C")</RadzenText>
+                </RadzenColumn>
+            </RadzenRow>
+            <RadzenRow>
+                <RadzenColumn>
+                    <RadzenText TextStyle="TextStyle.Subtitle1">Paid:</RadzenText>
+                </RadzenColumn>
+                <RadzenColumn>
+                    <RadzenText TextStyle="TextStyle.Subtitle1">@_invoice.PaidAmount.ToString("C")</RadzenText>
+                </RadzenColumn>
+            </RadzenRow>
+            <RadzenRow>
+                <RadzenColumn>
+                    <RadzenText TextStyle="TextStyle.H6">Balance Due:</RadzenText>
+                </RadzenColumn>
+                <RadzenColumn>
+                    <RadzenText TextStyle="TextStyle.H6">@_invoice.BalanceDue.ToString("C")</RadzenText>
+                </RadzenColumn>
+            </RadzenRow>
+        </RadzenStack>
+    </RadzenCard>
+}
+
+
+@code {
+    [Parameter] public int InvoiceId { get; set; }
+
+    private Invoice? _invoice;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _invoice = await DbContext.Invoices
+            .Include(i => i.Client)
+            .Include(i => i.InvoiceItems)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(i => i.Id == InvoiceId);
+    }
+
+    // This method calls the browser's print function
+    private async Task PrintInvoice()
+    {
+        await JSRuntime.InvokeVoidAsync("window.print");
+    }
+
+}

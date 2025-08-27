@@ -1,0 +1,126 @@
+@page "/services"
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.Components.Shared
+@using Clinic.Web.ViewModels
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin")]
+@inject ClinicDbContext DbContext
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+<PageTitle>Manage Services</PageTitle>
+
+<RadzenCard>
+    <RadzenRow AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
+        <RadzenColumn Size="6">
+            <RadzenText Text="Clinic Services" TextStyle="TextStyle.H3" TagName="TagName.H1"/>
+        </RadzenColumn>
+        <RadzenColumn Size="6" class="rz-text-align-right">
+            <RadzenButton Text="Add New Service" Icon="add_circle_outline" Click="AddService"/>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenDataGrid Data="@_serviceList" TItem="Service" AllowPaging="true" AllowSorting="true" AllowFiltering="true">
+        <Columns>
+            <RadzenDataGridColumn TItem="Service" Property="Name" Title="Service Name"/>
+            <RadzenDataGridColumn TItem="Service" Property="ServiceCategory.Name" Title="Category"/>
+            <RadzenDataGridColumn TItem="Service" Property="Price" Title="Price" FormatString="{0:C}" Width="160px"
+                                  TextAlign="TextAlign.Right"/>
+            <RadzenDataGridColumn TItem="Service" Title="Actions" Sortable="false" Filterable="false"
+                                  TextAlign="TextAlign.Center" Width="120px">
+                <Template Context="service">
+                    <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="edit" Size="ButtonSize.Small"
+                                  Click="@(() => EditService(service))"/>
+                    <RadzenButton ButtonStyle="ButtonStyle.Danger" Shade="Shade.Lighter" Icon="delete"
+                                  Size="ButtonSize.Small" Click="@(() => DeleteService(service))"
+                                  @onclick:stopPropagation="true"/>
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</RadzenCard>
+
+@code {
+    private List<Service> _serviceList = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadServices();
+    }
+
+    private async Task LoadServices()
+    {
+        _serviceList = await DbContext.Services.Include(s => s.ServiceCategory).AsNoTracking().OrderBy(s => s.Name).ToListAsync();
+    }
+
+    private async Task AddService()
+    {
+        var result = await DialogService.OpenAsync<ServiceDialog>("Add New Service",
+            new Dictionary<string, object> { { "Model", new ServiceViewModel() } },
+            new DialogOptions { Width = "500px" });
+
+        if (result is ServiceViewModel newModel)
+        {
+            var newService = new Service
+            {
+                Name = newModel.Name,
+                Description = newModel.Description,
+                Price = newModel.Price,
+                ServiceCategoryId = newModel.ServiceCategoryId!.Value
+            };
+
+            await DbContext.Services.AddAsync(newService);
+            await DbContext.SaveChangesAsync();
+            await LoadServices();
+        }
+    }
+
+    private async Task EditService(Service service)
+    {
+        var model = new ServiceViewModel
+        {
+            Id = service.Id,
+            Name = service.Name,
+            Description = service.Description,
+            Price = service.Price,
+            ServiceCategoryId = service.ServiceCategoryId
+        };
+
+        var result = await DialogService.OpenAsync<ServiceDialog>($"Edit {service.Name}",
+            new Dictionary<string, object> { { "Model", model } });
+
+        if (result is ServiceViewModel updatedModel)
+        {
+            var serviceToUpdate = await DbContext.Services.FindAsync(updatedModel.Id);
+            if (serviceToUpdate != null)
+            {
+                serviceToUpdate.Name = updatedModel.Name;
+                serviceToUpdate.Description = updatedModel.Description;
+                serviceToUpdate.Price = updatedModel.Price;
+                serviceToUpdate.ServiceCategoryId = updatedModel.ServiceCategoryId!.Value;
+
+                await DbContext.SaveChangesAsync();
+                await LoadServices();
+            }
+        }
+    }
+
+    private async Task DeleteService(Service service)
+    {
+        var confirmed = await DialogService.Confirm($"Are you sure you want to delete {service.Name}?", "Confirm Deletion");
+        if (confirmed == true)
+        {
+            var serviceToDelete = await DbContext.Services.FindAsync(service.Id);
+            if (serviceToDelete != null)
+            {
+                DbContext.Services.Remove(serviceToDelete);
+                await DbContext.SaveChangesAsync();
+                await LoadServices();
+            }
+        }
+    }
+
+}

@@ -1,0 +1,108 @@
+@page "/service-categories"
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.Components.Shared
+@using Clinic.Web.ViewModels
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin")]
+@inject ClinicDbContext DbContext
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+<PageTitle>Service Categories</PageTitle>
+
+<RadzenCard>
+    <RadzenRow AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
+        <RadzenColumn Size="6">
+            <RadzenText Text="Service Categories" TextStyle="TextStyle.H3" TagName="TagName.H1"/>
+        </RadzenColumn>
+        <RadzenColumn Size="6" class="rz-text-align-right">
+            <RadzenButton Text="Add New Category" Icon="add_circle_outline" Click="AddCategory"/>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenDataGrid Data="@_categoryList" TItem="ServiceCategory" AllowPaging="true" AllowSorting="true">
+        <Columns>
+            <RadzenDataGridColumn TItem="ServiceCategory" Property="Name" Title="Category Name"/>
+            <RadzenDataGridColumn TItem="ServiceCategory" Title="Actions" Sortable="false" Filterable="false"
+                                  TextAlign="TextAlign.Center" Width="120px">
+                <Template Context="category">
+                    <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="edit" Size="ButtonSize.Small"
+                                  Click="@(() => EditCategory(category))"/>
+                    <RadzenButton ButtonStyle="ButtonStyle.Danger" Shade="Shade.Lighter" Icon="delete"
+                                  Size="ButtonSize.Small" Click="@(() => DeleteCategory(category))"
+                                  @onclick:stopPropagation="true"/>
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</RadzenCard>
+
+@code {
+    private List<ServiceCategory> _categoryList = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+    }
+
+    private async Task LoadCategories()
+    {
+        _categoryList = await DbContext.ServiceCategories.AsNoTracking().OrderBy(s => s.Name).ToListAsync();
+    }
+
+    private async Task AddCategory()
+    {
+        var result = await DialogService.OpenAsync<ServiceCategoryDialog>("Add New Category",
+            new Dictionary<string, object> { { "Model", new ServiceCategoryViewModel() } });
+
+        if (result is ServiceCategoryViewModel newModel)
+        {
+            var newCategory = new ServiceCategory { Name = newModel.Name };
+            await DbContext.ServiceCategories.AddAsync(newCategory);
+            await DbContext.SaveChangesAsync();
+            await LoadCategories();
+        }
+    }
+
+    private async Task EditCategory(ServiceCategory category)
+    {
+        var model = new ServiceCategoryViewModel
+        {
+            Id = category.Id,
+            Name = category.Name
+        };
+
+        var result = await DialogService.OpenAsync<ServiceCategoryDialog>($"Edit {category.Name}",
+            new Dictionary<string, object> { { "Model", model } });
+
+        if (result is ServiceCategoryViewModel updatedModel)
+        {
+            var categoryToUpdate = await DbContext.ServiceCategories.FindAsync(updatedModel.Id);
+            if (categoryToUpdate != null)
+            {
+                categoryToUpdate.Name = updatedModel.Name;
+                await DbContext.SaveChangesAsync();
+                await LoadCategories();
+            }
+        }
+    }
+
+    private async Task DeleteCategory(ServiceCategory category)
+    {
+        var confirmed = await DialogService.Confirm($"Are you sure you want to delete {category.Name}?", "Confirm Deletion");
+        if (confirmed == true)
+        {
+            var toDelete = await DbContext.ServiceCategories.FindAsync(category.Id);
+            if (toDelete != null)
+            {
+                DbContext.ServiceCategories.Remove(toDelete);
+                await DbContext.SaveChangesAsync();
+                await LoadCategories();
+            }
+        }
+    }
+
+}

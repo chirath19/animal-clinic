@@ -1,0 +1,36 @@
+/* This block of styles will ONLY apply when the user prints the page */
+@media print {
+
+    /* Hide the sidebar and the main page header */
+    .rz-sidebar, .rz-header {
+        display: none !important;
+    }
+
+    /* Hide any element with the 'no-print' class (like our buttons) */
+    .no-print {
+        display: none !important;
+    }
+
+    /* Make the main content area take up the full page */
+    .rz-body {
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+    }
+
+    .rz-p-4 {
+        padding: 0 !important;
+    }
+
+    /* Ensure Radzen cards don't have excessive shadows when printed */
+    .rz-card {
+        box-shadow: none !important;
+        border: 1px solid #dee2e6; /* Add a simple border for clarity */
+    }
+
+    /* Remove the page background color when printing */
+    body {
+        background-color: #ffffff !important;
+    }
+}

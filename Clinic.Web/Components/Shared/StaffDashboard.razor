@@ -1,0 +1,99 @@
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin, Receptionist, Veterinarian")]
+@inject ClinicDbContext DbContext
+
+<PageTitle>Staff Dashboard</PageTitle>
+
+<RadzenText Text="Clinic Dashboard" TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-mb-4"/>
+
+<div class="row">
+    <div class="col-lg-8">
+        <RadzenCard class="h-100">
+            <RadzenText Text="Today's Appointments" TextStyle="TextStyle.H5"/>
+            @if (_todaysAppointments == null)
+            {
+                <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate"/>
+            }
+            else
+            {
+                <RadzenDataGrid Data="@_todaysAppointments" TItem="Appointment" AllowPaging="false"
+                                EmptyText="No appointments scheduled for today.">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="Appointment" Property="AppointmentDateTime" Title="Time"
+                                              FormatString="{0:t}" Width="120px"/>
+                        <RadzenDataGridColumn TItem="Appointment" Title="Client & Pet">
+                            <Template Context="appt">
+                                @appt.Client.FirstName @appt.Client.LastName (@appt.Animal.Name)
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="Appointment" Property="Reason" Title="Reason"/>
+                        <RadzenDataGridColumn TItem="Appointment" Property="Status" Title="Status" Width="120px"/>
+                    </Columns>
+                </RadzenDataGrid>
+            }
+        </RadzenCard>
+    </div>
+    <div class="col-lg-4">
+        <RadzenCard class="h-100">
+            <RadzenText Text="Low Stock Alerts" TextStyle="TextStyle.H5"/>
+            @if (_lowStockItems == null)
+            {
+                <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate"/>
+            }
+            else if (!_lowStockItems.Any())
+            {
+                <RadzenText TextStyle="TextStyle.Body1">All inventory levels are good.</RadzenText>
+            }
+            else
+            {
+                <RadzenDataList Data="@_lowStockItems" TItem="InventoryItem">
+                    <Template Context="item">
+                        <RadzenRow Gap="0" AlignItems="AlignItems.Center">
+                            <RadzenColumn>
+                                <RadzenText>@item.Name</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption">In Stock: @item.QuantityInStock (Reorder
+                                    at @item.ReorderLevel)
+                                </RadzenText>
+                            </RadzenColumn>
+                            <RadzenColumn>
+                                <RadzenButton Size="ButtonSize.ExtraSmall" Icon="shopping_cart"
+                                              ButtonStyle="ButtonStyle.Light" class="float-end"
+                                              LinkTo="/purchase-orders"/>
+                            </RadzenColumn>
+                        </RadzenRow>
+                    </Template>
+                </RadzenDataList>
+            }
+        </RadzenCard>
+    </div>
+</div>
+
+@code {
+    private List<Appointment>? _todaysAppointments;
+    private List<InventoryItem>? _lowStockItems;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var today = DateTime.Today;
+        var tomorrow = today.AddDays(1);
+
+        _todaysAppointments = await DbContext.Appointments
+            .Include(a => a.Client)
+            .Include(a => a.Animal)
+            .Where(a => a.AppointmentDateTime >= today && a.AppointmentDateTime < tomorrow)
+            .OrderBy(a => a.AppointmentDateTime)
+            .AsNoTracking()
+            .ToListAsync();
+
+        _lowStockItems = await DbContext.InventoryItems
+            .Where(i => i.QuantityInStock <= i.ReorderLevel)
+            .OrderBy(i => i.Name)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+}

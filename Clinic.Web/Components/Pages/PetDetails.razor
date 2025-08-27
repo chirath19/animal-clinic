@@ -1,0 +1,361 @@
+@page "/pet-details/{PetId:int}"
+@using Clinic.Common
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.Components.Shared
+@using Clinic.Web.ViewModels
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin, Receptionist, Veterinarian")]
+@inject ClinicDbContext DbContext
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+<PageTitle>Pet Details</PageTitle>
+
+@if (_animal == null)
+{
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate"/>
+}
+else
+{
+    <RadzenStack Gap="1.5rem">
+        <RadzenRow AlignItems="AlignItems.Center">
+            <RadzenColumn Size="6">
+                <RadzenText Text="@($"Medical Chart for {_animal.Name}")" TextStyle="TextStyle.H3"
+                            TagName="TagName.H1"/>
+            </RadzenColumn>
+            <RadzenColumn Size="6" class="rz-text-align-right">
+                <RadzenButton Text="Back to All Pets" Click="@(() => NavigationManager.NavigateTo("/all-pets"))"
+                              Icon="arrow_back" ButtonStyle="ButtonStyle.Secondary"/>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenTabs>
+            <Tabs>
+                <RadzenTabsItem Text="Overview">
+                    <RadzenRow Gap="1.5rem" class="rz-mt-4">
+                        <RadzenColumn Size="12" SizeMD="6">
+                            <RadzenCard>
+                                <RadzenFieldset Text="Pet Information">
+                                    <RadzenRow Gap="0.5rem">
+                                        <RadzenColumn Size="4">
+                                            <RadzenText TextStyle="TextStyle.Subtitle2">Species:</RadzenText>
+                                        </RadzenColumn>
+                                        <RadzenColumn Size="8">
+                                            <RadzenText>@_animal.Species</RadzenText>
+                                        </RadzenColumn>
+                                    </RadzenRow>
+                                    <RadzenRow Gap="0.5rem">
+                                        <RadzenColumn Size="4">
+                                            <RadzenText TextStyle="TextStyle.Subtitle2">Breed:</RadzenText>
+                                        </RadzenColumn>
+                                        <RadzenColumn Size="8">
+                                            <RadzenText>@_animal.Breed</RadzenText>
+                                        </RadzenColumn>
+                                    </RadzenRow>
+                                    <RadzenRow Gap="0.5rem">
+                                        <RadzenColumn Size="4">
+                                            <RadzenText TextStyle="TextStyle.Subtitle2">Date of Birth:</RadzenText>
+                                        </RadzenColumn>
+                                        <RadzenColumn Size="8">
+                                            <RadzenText>@_animal.DateOfBirth.ToShortDateString()</RadzenText>
+                                        </RadzenColumn>
+                                    </RadzenRow>
+                                </RadzenFieldset>
+                            </RadzenCard>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="6">
+                            <RadzenCard>
+                                <RadzenFieldset Text="Owner Information">
+                                    <RadzenRow Gap="0.5rem">
+                                        <RadzenColumn Size="4">
+                                            <RadzenText TextStyle="TextStyle.Subtitle2">Name:</RadzenText>
+                                        </RadzenColumn>
+                                        <RadzenColumn Size="8">
+                                            <RadzenText>@_animal.Client.FirstName @_animal.Client.LastName</RadzenText>
+                                        </RadzenColumn>
+                                    </RadzenRow>
+                                    <RadzenRow Gap="0.5rem">
+                                        <RadzenColumn Size="4">
+                                            <RadzenText TextStyle="TextStyle.Subtitle2">Phone:</RadzenText>
+                                        </RadzenColumn>
+                                        <RadzenColumn Size="8">
+                                            <RadzenText>@_animal.Client.PhoneNumber</RadzenText>
+                                        </RadzenColumn>
+                                    </RadzenRow>
+                                </RadzenFieldset>
+                            </RadzenCard>
+                        </RadzenColumn>
+                    </RadzenRow>
+                </RadzenTabsItem>
+
+                <RadzenTabsItem Text="Appointments">
+                    <RadzenCard class="rz-mt-4">
+                        <RadzenDataGrid Data="@_animal.Appointments" TItem="Appointment" AllowPaging="true" PageSize="5"
+                                        RowSelect="OnAppointmentSelect">
+                            <Columns>
+                                <RadzenDataGridColumn TItem="Appointment" Property="AppointmentDateTime"
+                                                      Title="Date & Time" FormatString="{0:f}"/>
+                                <RadzenDataGridColumn TItem="Appointment" Property="Reason" Title="Reason"/>
+                                <RadzenDataGridColumn TItem="Appointment" Property="Staff.FullName" Title="With"/>
+                                <RadzenDataGridColumn TItem="Appointment" Property="Status" Title="Status"/>
+                            </Columns>
+                        </RadzenDataGrid>
+                    </RadzenCard>
+                </RadzenTabsItem>
+
+                <RadzenTabsItem Text="Medical Records">
+                    <RadzenCard class="rz-mt-4">
+                        <RadzenDataGrid Data="@_animal.MedicalRecords" TItem="MedicalRecord" AllowPaging="true"
+                                        PageSize="3">
+                            <Columns>
+                                <RadzenDataGridColumn TItem="MedicalRecord" Property="RecordDate" Title="Visit Date"
+                                                      FormatString="{0:d}"/>
+                                <RadzenDataGridColumn TItem="MedicalRecord" Property="Assessment" Title="Assessment"/>
+                                <RadzenDataGridColumn TItem="MedicalRecord" Property="Staff.FullName"
+                                                      Title="Recorded By"/>
+                                <RadzenDataGridColumn TItem="MedicalRecord" Title="Actions" Sortable="false"
+                                                      Filterable="false" TextAlign="TextAlign.Center" Width="120px">
+                                    <Template Context="record">
+                                        <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="edit"
+                                                      Size="ButtonSize.Small"
+                                                      Click="@(() => EditMedicalRecord(record))"/>
+                                        <RadzenButton ButtonStyle="ButtonStyle.Danger" Shade="Shade.Lighter"
+                                                      Icon="delete" Size="ButtonSize.Small"
+                                                      Click="@(() => DeleteMedicalRecord(record))"/>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                            </Columns>
+                        </RadzenDataGrid>
+                    </RadzenCard>
+                </RadzenTabsItem>
+
+                <RadzenTabsItem Text="Vaccinations">
+                    <RadzenCard class="rz-mt-4">
+                        <RadzenDataGrid Data="@_animal.VaccinationRecords" TItem="VaccinationRecord" AllowPaging="true"
+                                        PageSize="5">
+                            <Columns>
+                                <RadzenDataGridColumn TItem="VaccinationRecord" Property="VaccineName" Title="Vaccine"/>
+                                <RadzenDataGridColumn TItem="VaccinationRecord" Property="DateAdministered"
+                                                      Title="Date Given" FormatString="{0:d}"/>
+                                <RadzenDataGridColumn TItem="VaccinationRecord" Property="NextDueDate" Title="Next Due"
+                                                      FormatString="{0:d}"/>
+                                <RadzenDataGridColumn TItem="VaccinationRecord" Title="Actions" Sortable="false"
+                                                      Filterable="false" TextAlign="TextAlign.Center" Width="120px">
+                                    <Template Context="vaccine">
+                                        <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="edit"
+                                                      Size="ButtonSize.Small"
+                                                      Click="@(() => EditVaccination(vaccine))"/>
+                                        <RadzenButton ButtonStyle="ButtonStyle.Danger" Shade="Shade.Lighter"
+                                                      Icon="delete" Size="ButtonSize.Small"
+                                                      Click="@(() => DeleteVaccination(vaccine))"/>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                            </Columns>
+                        </RadzenDataGrid>
+                    </RadzenCard>
+                </RadzenTabsItem>
+
+                <RadzenTabsItem Text="Surgical History">
+                    <RadzenCard class="rz-mt-4">
+                        <RadzenDataGrid Data="@_animal.SurgicalHistories" TItem="SurgicalHistory" AllowPaging="true"
+                                        PageSize="5">
+                            <Columns>
+                                <RadzenDataGridColumn TItem="SurgicalHistory" Property="ProcedureName"
+                                                      Title="Procedure"/>
+                                <RadzenDataGridColumn TItem="SurgicalHistory" Property="SurgeryDate" Title="Date"
+                                                      FormatString="{0:d}"/>
+                                <RadzenDataGridColumn TItem="SurgicalHistory" Property="Staff.FullName"
+                                                      Title="Surgeon"/>
+                                <RadzenDataGridColumn TItem="SurgicalHistory" Title="Actions" Sortable="false"
+                                                      Filterable="false" TextAlign="TextAlign.Center" Width="120px">
+                                    <Template Context="surgery">
+                                        <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="edit"
+                                                      Size="ButtonSize.Small" Click="@(() => EditSurgery(surgery))"/>
+                                        <RadzenButton ButtonStyle="ButtonStyle.Danger" Shade="Shade.Lighter"
+                                                      Icon="delete" Size="ButtonSize.Small"
+                                                      Click="@(() => DeleteSurgery(surgery))"/>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                            </Columns>
+                        </RadzenDataGrid>
+                    </RadzenCard>
+                </RadzenTabsItem>
+
+            </Tabs>
+        </RadzenTabs>
+    </RadzenStack>
+}
+
+@code {
+    [Parameter] public int PetId { get; set; }
+
+    private Animal? _animal;
+    private Staff? _currentStaff;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authState.User);
+        if (user != null)
+        {
+            _currentStaff = await DbContext.Staff.AsNoTracking().FirstOrDefaultAsync(s => s.ApplicationUserId == user.Id);
+        }
+
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _animal = await DbContext.Animals
+            .Include(a => a.Client)
+            .Include(a => a.Appointments).ThenInclude(ap => ap.Staff)
+            .Include(a => a.MedicalRecords).ThenInclude(mr => mr.Staff)
+            .Include(a => a.VaccinationRecords).ThenInclude(vr => vr.Staff)
+            .Include(a => a.SurgicalHistories).ThenInclude(sh => sh.Staff)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == PetId);
+    }
+
+    private async Task OnAppointmentSelect(Appointment args)
+    {
+        // --- THIS IS THE FIX ---
+        // Fetch the full appointment details before opening the dialog
+        var fullAppointment = await DbContext.Appointments
+            .Include(a => a.Client)
+            .Include(a => a.Animal)
+            .Include(a => a.Staff)
+            .Include(a => a.MedicalRecord)
+            .Include(a => a.Service).ThenInclude(s => s.ServiceCategory)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == args.Id);
+
+        if (fullAppointment != null)
+        {
+            await DialogService.OpenAsync<AppointmentDetails>($"Details for {fullAppointment.Animal.Name}",
+                new Dictionary<string, object> { { "Appointment", fullAppointment } },
+                new DialogOptions { Width = "700px", Resizable = true, Draggable = true });
+        }
+    }
+
+    private async Task EditMedicalRecord(MedicalRecord record)
+    {
+        var recordToEdit = await DbContext.MedicalRecords.FindAsync(record.Id);
+        if (recordToEdit == null) return;
+
+        var result = await DialogService.OpenAsync<EditMedicalRecordDialog>("Edit SOAP Notes",
+            new Dictionary<string, object> { { "MedicalRecord", recordToEdit } });
+
+        if (result is MedicalRecord)
+        {
+            await DbContext.SaveChangesAsync();
+            await LoadData();
+        }
+    }
+
+    private async Task DeleteMedicalRecord(MedicalRecord record)
+    {
+        var confirmed = await DialogService.Confirm("Are you sure?", "Confirm Deletion");
+        if (confirmed == true)
+        {
+            var toDelete = await DbContext.MedicalRecords.FindAsync(record.Id);
+            if (toDelete != null)
+            {
+                DbContext.MedicalRecords.Remove(toDelete);
+                await DbContext.SaveChangesAsync();
+                await LoadData();
+            }
+        }
+    }
+
+    private async Task EditVaccination(VaccinationRecord vaccine)
+    {
+        var model = new EditVaccinationViewModel
+        {
+            Id = vaccine.Id,
+            InventoryItemId = vaccine.InventoryItemId,
+            VaccineName = vaccine.VaccineName,
+            BatchNumber = vaccine.BatchNumber,
+            DateAdministered = vaccine.DateAdministered,
+            NextDueDate = vaccine.NextDueDate
+        };
+        var result = await DialogService.OpenAsync<EditVaccinationDialog>("Edit Vaccination", new Dictionary<string, object> { { "Model", model } });
+        if (result is EditVaccinationViewModel returnedModel)
+        {
+            var toUpdate = await DbContext.VaccinationRecords.FindAsync(returnedModel.Id);
+            if (toUpdate != null)
+            {
+                toUpdate.InventoryItemId = returnedModel.InventoryItemId;
+                toUpdate.VaccineName = returnedModel.VaccineName;
+                toUpdate.BatchNumber = returnedModel.BatchNumber;
+                toUpdate.DateAdministered = returnedModel.DateAdministered;
+                toUpdate.NextDueDate = returnedModel.NextDueDate;
+                await DbContext.SaveChangesAsync();
+                await LoadData();
+            }
+        }
+    }
+
+    private async Task DeleteVaccination(VaccinationRecord vaccine)
+    {
+        var confirmed = await DialogService.Confirm("Are you sure?", "Confirm Deletion");
+        if (confirmed == true)
+        {
+            var toDelete = await DbContext.VaccinationRecords.FindAsync(vaccine.Id);
+            if (toDelete != null)
+            {
+                DbContext.VaccinationRecords.Remove(toDelete);
+                await DbContext.SaveChangesAsync();
+                await LoadData();
+            }
+        }
+    }
+
+    private async Task EditSurgery(SurgicalHistory surgery)
+    {
+        var model = new EditSurgicalHistoryViewModel
+        {
+            Id = surgery.Id,
+            ProcedureName = surgery.ProcedureName,
+            SurgeryDate = surgery.SurgeryDate,
+            Notes = surgery.Notes,
+            StaffId = surgery.StaffId
+        };
+        var result = await DialogService.OpenAsync<EditSurgicalHistoryDialog>("Edit Surgical Record", new Dictionary<string, object> { { "Model", model } });
+        if (result is EditSurgicalHistoryViewModel returnedModel)
+        {
+            var toUpdate = await DbContext.SurgicalHistories.FindAsync(returnedModel.Id);
+            if (toUpdate != null)
+            {
+                toUpdate.ProcedureName = returnedModel.ProcedureName;
+                toUpdate.SurgeryDate = returnedModel.SurgeryDate;
+                toUpdate.Notes = returnedModel.Notes;
+                toUpdate.StaffId = returnedModel.StaffId!.Value;
+                await DbContext.SaveChangesAsync();
+                await LoadData();
+            }
+        }
+    }
+
+    private async Task DeleteSurgery(SurgicalHistory surgery)
+    {
+        var confirmed = await DialogService.Confirm("Are you sure?", "Confirm Deletion");
+        if (confirmed == true)
+        {
+            var toDelete = await DbContext.SurgicalHistories.FindAsync(surgery.Id);
+            if (toDelete != null)
+            {
+                DbContext.SurgicalHistories.Remove(toDelete);
+                await DbContext.SaveChangesAsync();
+                await LoadData();
+            }
+        }
+    }
+
+}

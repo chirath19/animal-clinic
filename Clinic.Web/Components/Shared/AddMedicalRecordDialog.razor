@@ -1,0 +1,71 @@
+@using Clinic.Domain.Entities
+@using Clinic.Web.ViewModels
+@inject DialogService DialogService
+
+<RadzenTemplateForm TItem="AddMedicalRecordViewModel" Data="@_model" Submit="@OnSave">
+    <DataAnnotationsValidator/>
+    <RadzenStack Gap="1.5rem" class="rz-p-4">
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Subjective"/>
+            <RadzenTextArea @bind-Value="@_model.Subjective" Rows="3" Style="width: 100%;"/>
+        </RadzenStack>
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Objective"/>
+            <RadzenTextArea @bind-Value="@_model.Objective" Rows="3" Style="width: 100%;"/>
+        </RadzenStack>
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Assessment (Diagnosis)" Component="Assessment"/>
+            <RadzenTextArea @bind-Value="@_model.Assessment" Name="Assessment" Rows="3" Style="width: 100%;"/>
+            <RadzenRequiredValidator Component="Assessment" Text="An assessment is required."/>
+        </RadzenStack>
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Plan"/>
+            <RadzenTextArea @bind-Value="@_model.Plan" Rows="3" Style="width: 100%;"/>
+        </RadzenStack>
+
+        <hr/>
+        <RadzenText Text="Visit Also Includes:" TextStyle="TextStyle.H6"/>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
+            <RadzenCheckBox @bind-Value="@_model.RequiresPrescription" TValue="bool" Name="ReqPrescription"/>
+            <RadzenLabel Text="Prescription" Component="ReqPrescription"/>
+        </RadzenStack>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
+            <RadzenCheckBox @bind-Value="@_model.RequiresMedicationAdmin" TValue="bool" Name="ReqMedAdmin"/>
+            <RadzenLabel Text="In-Clinic Medication" Component="ReqMedAdmin"/>
+        </RadzenStack>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
+            <RadzenCheckBox @bind-Value="@_model.RequiresVaccination" TValue="bool" Name="ReqVax"/>
+            <RadzenLabel Text="Vaccination" Component="ReqVax"/>
+        </RadzenStack>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
+            <RadzenCheckBox @bind-Value="@_model.RequiresSurgery" TValue="bool" Name="ReqSurgery"/>
+            <RadzenLabel Text="Surgery" Component="ReqSurgery"/>
+        </RadzenStack>
+    </RadzenStack>
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem" Class="rz-p-4">
+        <RadzenButton ButtonType="ButtonType.Submit" Text="Save Record"/>
+        <RadzenButton Text="Cancel" Click="@(() => DialogService.Close(null))" ButtonStyle="ButtonStyle.Light"/>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    private readonly AddMedicalRecordViewModel _model = new();
+
+    private void OnSave(AddMedicalRecordViewModel viewModel)
+    {
+        var newRecord = new MedicalRecord
+        {
+            Subjective = viewModel.Subjective,
+            Objective = viewModel.Objective,
+            Assessment = viewModel.Assessment,
+            Plan = viewModel.Plan,
+            RequiresPrescription = viewModel.RequiresPrescription,
+            RequiresVaccination = viewModel.RequiresVaccination,
+            RequiresMedicationAdmin = viewModel.RequiresMedicationAdmin,
+            RequiresSurgery = viewModel.RequiresSurgery // Add this line
+        };
+        DialogService.Close(newRecord);
+    }
+
+}

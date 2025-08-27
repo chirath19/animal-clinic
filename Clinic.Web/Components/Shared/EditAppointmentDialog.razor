@@ -1,0 +1,70 @@
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Microsoft.EntityFrameworkCore
+@inject ClinicDbContext DbContext
+@inject DialogService DialogService
+
+<RadzenTemplateForm TItem="Appointment" Data="@Appointment" Submit="@OnSubmit">
+    <RadzenStack Gap="1.5rem">
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Client"/>
+            <RadzenTextBox Value="@(Appointment.Client.FirstName + " " + Appointment.Client.LastName)" Disabled="true"
+                           Style="width: 100%;"/>
+        </RadzenStack>
+
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Pet"/>
+            <RadzenTextBox Value="@(Appointment.Animal.Name)" Disabled="true" Style="width: 100%;"/>
+        </RadzenStack>
+
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="With Staff" Component="Staff"/>
+            <RadzenDropDown @bind-Value="@Appointment.StaffId" TValue="int" Data="@_staffList" ValueProperty="Id"
+                            Name="Staff" Style="width: 100%;">
+                <Template Context="staff">
+                    @((staff as Staff)?.FirstName) @((staff as Staff)?.LastName)
+                </Template>
+            </RadzenDropDown>
+            <RadzenRequiredValidator Component="Staff" Text="Staff is required"/>
+        </RadzenStack>
+
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Start Time" Component="Start"/>
+            <RadzenDatePicker @bind-Value="@Appointment.AppointmentDateTime" ShowTime="true" Name="Start"
+                              Style="width: 100%;"/>
+        </RadzenStack>
+
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="End Time" Component="End"/>
+            <RadzenDatePicker @bind-Value="@Appointment.EndTime" ShowTime="true" Name="End" Style="width: 100%;"/>
+        </RadzenStack>
+
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Reason" Component="Reason"/>
+            <RadzenTextBox @bind-Value="@Appointment.Reason" Name="Reason" Style="width: 100%;"/>
+            <RadzenRequiredValidator Component="Reason" Text="Reason is required"/>
+        </RadzenStack>
+    </RadzenStack>
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem" Class="rz-mt-4">
+        <RadzenButton ButtonType="ButtonType.Submit" Text="Save"/>
+        <RadzenButton Text="Cancel" Click="@(() => DialogService.Close(null))" ButtonStyle="ButtonStyle.Light"/>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter] public Appointment Appointment { get; set; } = null!;
+
+    private List<Staff> _staffList = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _staffList = await DbContext.Staff.AsNoTracking().ToListAsync();
+    }
+
+    void OnSubmit(Appointment args)
+    {
+        DialogService.Close(args);
+    }
+
+}

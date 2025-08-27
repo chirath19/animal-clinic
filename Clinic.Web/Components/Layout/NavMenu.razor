@@ -1,0 +1,55 @@
+﻿<RadzenPanelMenu>
+    <RadzenPanelMenuItem Text="Home" Icon="home" Path="/"/>
+
+    @* Client-specific links, visible only when logged in *@
+    <AuthorizeView>
+        <Authorized>
+            <RadzenPanelMenuItem Text="Client Portal" Icon="account_box">
+                <RadzenPanelMenuItem Text="My Dashboard" Icon="dashboard" Path="/dashboard"/>
+            </RadzenPanelMenuItem>
+        </Authorized>
+    </AuthorizeView>
+
+    @* Staff-specific links, visible only to staff roles *@
+    <AuthorizeView Roles="Admin, Receptionist, Veterinarian">
+        @* The context variable gives us access to the user's state *@
+        <Authorized>
+            <RadzenPanelMenuItem Text="Clinic Management" Icon="medical_services">
+
+                @* Link for Admins and Receptionists *@
+                @if (context.User.IsInRole("Admin") || context.User.IsInRole("Receptionist"))
+                {
+                    <RadzenPanelMenuItem Text="Appointments" Icon="event" Path="/appointments"/>
+                    <RadzenPanelMenuItem Text="Invoicing" Icon="receipt_long" Path="/invoices"/>
+                }
+
+                @* Link for all staff roles (already handled by the outer AuthorizeView) *@
+                <RadzenPanelMenuItem Text="Pets" Icon="pets" Path="/all-pets"/>
+
+                @* Link only for Admins *@
+                @if (context.User.IsInRole("Admin"))
+                {
+                    <RadzenPanelMenuItem Text="Staff" Icon="people" Path="/staff-management"/>
+                    <RadzenPanelMenuItem Text="Reporting" Icon="analytics" Path="/reporting-dashboard"/>
+                }
+
+            </RadzenPanelMenuItem>
+        </Authorized>
+    </AuthorizeView>
+    <AuthorizeView Roles="Admin, Receptionist">
+        <RadzenPanelMenuItem Text="Operations" Icon="storefront">
+            <RadzenPanelMenuItem Text="Pharmacy & Shop" Icon="local_pharmacy" Path="/shop"/>
+            <RadzenPanelMenuItem Text="Inventory" Icon="inventory_2">
+                <RadzenPanelMenuItem Text="Products" Icon="list_alt" Path="/inventory"/>
+                <RadzenPanelMenuItem Text="Suppliers" Icon="groups" Path="/suppliers"/>
+                <RadzenPanelMenuItem Text="Purchase Orders" Icon="shopping_cart" Path="/purchase-orders"/>
+            </RadzenPanelMenuItem>
+
+            @* Add this new menu item for managing service prices *@
+            <RadzenPanelMenuItem Text="Services & Pricing" Icon="price_change">
+                <RadzenPanelMenuItem Text="Services" Icon="list" Path="/services"/>
+                <RadzenPanelMenuItem Text="Categories" Icon="category" Path="/service-categories"/>
+            </RadzenPanelMenuItem>
+        </RadzenPanelMenuItem>
+    </AuthorizeView>
+</RadzenPanelMenu>

@@ -1,0 +1,61 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Home</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        @* User is logged in. Let's check their role. *@
+        @if (_isStaff)
+        {
+            <Clinic.Web.Components.Shared.StaffDashboard/>
+        }
+        else
+        {
+            @* This is a logged-in client, show a welcome message or redirect *@
+            <p>Welcome, client! Navigate to your dashboard to see your pets and appointments.</p>
+        }
+    </Authorized>
+    <NotAuthorized>
+        @* User is not logged in. Show the public welcome page. *@
+        <div class="text-center">
+            <RadzenText Text="Welcome to the Animal Clinic" TextStyle="TextStyle.H2" TagName="TagName.H1"/>
+            <RadzenText Text="Your trusted partner in pet healthcare in Sri Lanka." TextStyle="TextStyle.Subtitle1"
+                        class="rz-mt-2"/>
+            <RadzenImage Path="favicon.png" Style="width: 150px; height: 150px; margin-top: 2rem;"/>
+            <div class="mt-4">
+                <RadzenButton Text="Login" Path="Identity/Account/Login" ButtonStyle="ButtonStyle.Primary"
+                              Size="ButtonSize.Large"/>
+                <RadzenButton Text="Register" Path="Identity/Account/Register" ButtonStyle="ButtonStyle.Secondary"
+                              Size="ButtonSize.Large" Class="rz-ms-2"/>
+            </div>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private bool _isStaff;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            // Check if the user has any of the staff roles
+            if (user.IsInRole("Admin") || user.IsInRole("Veterinarian") || user.IsInRole("Receptionist"))
+            {
+                _isStaff = true;
+            }
+            else
+            {
+                // Optional: If a client lands on the home page, redirect them to their own dashboard
+                NavigationManager.NavigateTo("/dashboard");
+            }
+        }
+    }
+
+}

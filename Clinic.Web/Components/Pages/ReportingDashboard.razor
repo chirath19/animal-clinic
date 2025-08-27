@@ -1,0 +1,125 @@
+@page "/reporting-dashboard"
+@using Clinic.Infrastructure.Persistence
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin")]
+@inject ClinicDbContext DbContext
+
+<PageTitle>Reporting Dashboard</PageTitle>
+
+<RadzenText Text="Reporting Dashboard" TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-mb-4"/>
+
+@if (!_isLoaded)
+{
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate"/>
+}
+else
+{
+    @* --- START: Key Performance Indicator (KPI) Cards --- *@
+    <RadzenRow Gap="1rem" class="rz-mb-4">
+        <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+            <RadzenCard>
+                <RadzenText TextStyle="TextStyle.Subtitle2">Revenue (This Month)</RadzenText>
+                <RadzenText TextStyle="TextStyle.H5">@_revenueThisMonth.ToString("C")</RadzenText>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+            <RadzenCard>
+                <RadzenText TextStyle="TextStyle.Subtitle2">Appointments Today</RadzenText>
+                <RadzenText TextStyle="TextStyle.H5">@_appointmentsToday</RadzenText>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+            <RadzenCard>
+                <RadzenText TextStyle="TextStyle.Subtitle2">New Clients (This Month)</RadzenText>
+                <RadzenText TextStyle="TextStyle.H5">@_newClientsThisMonth</RadzenText>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+            <RadzenCard>
+                <RadzenText TextStyle="TextStyle.Subtitle2">Total Pets in System</RadzenText>
+                <RadzenText TextStyle="TextStyle.H5">@_totalPets</RadzenText>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+    @* --- END: KPI Cards --- *@
+
+    @* --- START: Revenue Chart --- *@
+    <RadzenCard>
+        <RadzenText Text="Revenue (Last 30 Days)" TextStyle="TextStyle.H5"/>
+        <RadzenChart>
+            <RadzenColumnSeries Data="@_dailyRevenue" CategoryProperty="Date" Title="Revenue" ValueProperty="Revenue">
+                <RadzenSeriesTooltipFormatOptions Format="currency"/>
+            </RadzenColumnSeries>
+            <RadzenCategoryAxis FormatString="{0:MMM d}"/>
+            <RadzenValueAxis>
+                <RadzenGridLines Visible="true"/>
+                <RadzenAxisTitle Text="Daily Revenue"/>
+            </RadzenValueAxis>
+        </RadzenChart>
+    </RadzenCard>
+    @* --- END: Revenue Chart --- *@
+}
+
+
+@code {
+    private bool _isLoaded;
+
+    // Data for KPIs
+    private decimal _revenueThisMonth;
+    private int _appointmentsToday;
+    private int _newClientsThisMonth;
+    private int _totalPets;
+
+    // Data for Chart
+    private List<DailyRevenue> _dailyRevenue = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var today = DateTime.Today;
+        var startOfMonth = new DateTime(today.Year, today.Month, 1);
+        var thirtyDaysAgo = today.AddDays(-30);
+
+        // --- KPI Queries (Corrected) ---
+        // 1. Fetch the list of amounts from the DB first
+        var monthlyRevenueData = await DbContext.Invoices
+            .Where(i => i.InvoiceDate >= startOfMonth && i.Status == "Paid")
+            .Select(i => i.TotalAmount)
+            .ToListAsync();
+        // 2. Sum the list in C# memory
+        _revenueThisMonth = monthlyRevenueData.Sum();
+
+        _appointmentsToday = await DbContext.Appointments
+            .CountAsync(a => a.AppointmentDateTime.Date == today);
+
+        _newClientsThisMonth = await DbContext.Clients
+            .CountAsync(c => c.DateCreated >= startOfMonth);
+
+        _totalPets = await DbContext.Animals.CountAsync();
+
+        // --- Chart Query (Corrected) ---
+        // 1. Fetch the raw invoice data from the DB first
+        var paidInvoicesLast30Days = await DbContext.Invoices
+            .Where(i => i.InvoiceDate >= thirtyDaysAgo && i.Status == "Paid")
+            .ToListAsync();
+        // 2. Perform the GroupBy and Sum in C# memory
+        _dailyRevenue = paidInvoicesLast30Days
+            .GroupBy(i => i.InvoiceDate.Date)
+            .Select(g => new DailyRevenue { Date = g.Key, Revenue = g.Sum(i => i.TotalAmount) })
+            .OrderBy(dr => dr.Date)
+            .ToList();
+
+        _isLoaded = true;
+    }
+
+    // Helper class for chart data
+    public class DailyRevenue
+    {
+        public DateTime Date { get; set; }
+        public decimal Revenue { get; set; }
+    }
+
+}
+
+}

@@ -1,0 +1,94 @@
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Microsoft.EntityFrameworkCore
+@inject ClinicDbContext DbContext
+@inject DialogService DialogService
+
+<RadzenTemplateForm TItem="Invoice" Data="@_invoice" Submit="@OnSave">
+    <RadzenStack Gap="1.5rem">
+        <RadzenFieldset Text="Invoice Details">
+            <RadzenStack Gap="1rem">
+                <RadzenDropDown AllowFiltering="true" Data="@_clientList" TValue="int" Placeholder="Select a client..."
+                                @bind-Value="@_invoice.ClientId" Style="width:100%;" Name="Client">
+                    <Template Context="client">
+                        @((client as Client)?.FirstName) @((client as Client)?.LastName)
+                    </Template>
+                </RadzenDropDown>
+                <RadzenRequiredValidator Component="Client" Text="Please select a client"/>
+            </RadzenStack>
+        </RadzenFieldset>
+
+        <RadzenFieldset Text="Add Items">
+            <RadzenStack Gap="1rem">
+                <RadzenDropDown AllowFiltering="true" Data="@_inventoryItems" TextProperty="Name" ValueProperty="Id"
+                                Placeholder="Search for a product to add..." @bind-Value="@_selectedItemId"
+                                Change="@OnProductSelected" Style="width:100%;"/>
+
+                <RadzenButton Text="Add Item" Click="AddItem" ButtonStyle="ButtonStyle.Secondary"
+                              Disabled="@(_selectedItemId == null)"/>
+            </RadzenStack>
+        </RadzenFieldset>
+
+        <RadzenDataGrid Data="@_invoice.InvoiceItems" TItem="InvoiceItem" AllowPaging="false">
+            <Columns>
+                <RadzenDataGridColumn TItem="InvoiceItem" Property="Description" Title="Description"/>
+                <RadzenDataGridColumn TItem="InvoiceItem" Property="Quantity" Title="Qty" Width="80px"/>
+                <RadzenDataGridColumn TItem="InvoiceItem" Property="UnitPrice" Title="Price" FormatString="{0:C}"
+                                      Width="120px"/>
+                <RadzenDataGridColumn TItem="InvoiceItem" Title="" Sortable="false" Filterable="false" Width="60px">
+                    <Template Context="item">
+                        <RadzenButton ButtonStyle="ButtonStyle.Danger" Shade="Shade.Lighter" Icon="delete"
+                                      Size="ButtonSize.Small" Click="@(() => _invoice.InvoiceItems.Remove(item))"/>
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </RadzenStack>
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem" Class="rz-mt-4">
+        <RadzenButton ButtonType="ButtonType.Submit" Text="Create Invoice"/>
+        <RadzenButton Text="Cancel" Click="@(() => DialogService.Close(null))" ButtonStyle="ButtonStyle.Light"/>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    private readonly Invoice _invoice = new() { InvoiceDate = DateTime.UtcNow, Status = "Unpaid" };
+    private List<Client> _clientList = new();
+    private List<InventoryItem> _inventoryItems = new();
+    private int? _selectedItemId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _clientList = await DbContext.Clients.AsNoTracking().ToListAsync();
+        _inventoryItems = await DbContext.InventoryItems.AsNoTracking().ToListAsync();
+    }
+
+    private void OnProductSelected(object value)
+    {
+        _selectedItemId = value as int?;
+    }
+
+    private void AddItem()
+    {
+        var itemToAdd = _inventoryItems.FirstOrDefault(i => i.Id == _selectedItemId);
+        if (itemToAdd != null)
+        {
+            _invoice.InvoiceItems.Add(new InvoiceItem
+            {
+                Description = itemToAdd.Name,
+                Quantity = 1,
+                UnitPrice = itemToAdd.UnitPrice,
+                InventoryItemId = itemToAdd.Id
+            });
+        }
+
+        _selectedItemId = null; // Reset dropdown
+    }
+
+    private void OnSave(Invoice invoice)
+    {
+        invoice.TotalAmount = invoice.InvoiceItems.Sum(i => i.TotalPrice);
+        DialogService.Close(invoice);
+    }
+
+}

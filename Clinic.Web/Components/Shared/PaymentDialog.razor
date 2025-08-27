@@ -1,0 +1,66 @@
+@using System.ComponentModel.DataAnnotations
+@inject DialogService DialogService
+
+<RadzenTemplateForm TItem="PaymentModel" Data="@_model" Submit="@OnSubmit">
+    <DataAnnotationsValidator/>
+    <RadzenStack Gap="1.5rem">
+        <RadzenRow AlignItems="AlignItems.Center">
+            <RadzenColumn>
+                <RadzenText TextStyle="TextStyle.H5">Total Due:</RadzenText>
+            </RadzenColumn>
+            <RadzenColumn>
+                <RadzenText TextStyle="TextStyle.H5" class="rz-text-align-right">@TotalAmount.ToString("C")</RadzenText>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Amount Paid by Client" Component="AmountPaid"/>
+            <RadzenNumeric @bind-Value="@_model.AmountPaid" Name="AmountPaid" TValue="decimal" Format="C"
+                           Style="width: 100%;"/>
+            <RadzenRequiredValidator Component="AmountPaid" Text="Payment amount is required"/>
+        </RadzenStack>
+
+        <hr/>
+
+        <RadzenRow AlignItems="AlignItems.Center">
+            <RadzenColumn>
+                <RadzenText TextStyle="TextStyle.H6">Change Due:</RadzenText>
+            </RadzenColumn>
+            <RadzenColumn>
+                <RadzenText TextStyle="TextStyle.H6" class="rz-text-align-right"
+                            Style="color: var(--rz-success);">@(_model.AmountPaid - TotalAmount > 0 ? (_model.AmountPaid - TotalAmount).ToString("C") : 0.ToString("C"))</RadzenText>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenStack>
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem" Class="rz-mt-4">
+        <RadzenButton ButtonType="ButtonType.Submit" Text="Confirm Sale" Disabled="@(_model.AmountPaid < TotalAmount)"/>
+        <RadzenButton Text="Cancel" Click="@(() => DialogService.Close(null))" ButtonStyle="ButtonStyle.Light"/>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter] public decimal TotalAmount { get; set; }
+
+    private readonly PaymentModel _model = new();
+
+    protected override void OnInitialized()
+    {
+        // Pre-fill the payment amount with the total due for convenience
+        _model.AmountPaid = TotalAmount;
+    }
+
+    private void OnSubmit(PaymentModel model)
+    {
+        // Close the dialog and pass the paid amount back
+        DialogService.Close(model.AmountPaid);
+    }
+
+    public class PaymentModel
+    {
+        [Required]
+        [Range(0.01, double.MaxValue)]
+        public decimal AmountPaid { get; set; }
+    }
+
+}

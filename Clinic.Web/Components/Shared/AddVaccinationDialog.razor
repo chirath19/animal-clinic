@@ -1,0 +1,104 @@
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.ViewModels
+@using Microsoft.EntityFrameworkCore
+@inject ClinicDbContext DbContext
+@inject DialogService DialogService
+
+<RadzenTemplateForm TItem="AddVaccinationViewModel" Data="@_model" Submit="@OnSubmit">
+    <DataAnnotationsValidator/>
+    <RadzenStack Gap="1.5rem">
+        <RadzenFieldset Text="Vaccine Details">
+            <RadzenStack Gap="1rem">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center">
+                    <RadzenCheckBox @bind-Value="@_isExternal" TValue="bool"/>
+                    <RadzenLabel Text="Administering a client-provided vaccine"/>
+                </RadzenStack>
+                <hr/>
+                @if (_isExternal)
+                {
+                    <RadzenTextBox @bind-Value="@_model.VaccineName" Placeholder="Vaccine Name..." Style="width: 100%;"
+                                   Name="VaccineName"/>
+                    <RadzenRequiredValidator Component="VaccineName" Text="Vaccine name is required"/>
+                }
+                else
+                {
+                    <RadzenDropDown AllowFiltering="true" Data="@_inventoryItems" TextProperty="Name" ValueProperty="Id"
+                                    Placeholder="Search for an in-house vaccine..."
+                                    @bind-Value="@_model.InventoryItemId"
+                                    Change="@OnProductSelected" Style="width:100%;" Name="InventoryItem"/>
+                    <RadzenRequiredValidator Component="InventoryItem" Text="Please select a vaccine from inventory"/>
+                }
+                <RadzenTextBox @bind-Value="@_model.BatchNumber" Placeholder="Batch Number" Style="width: 100%;"/>
+            </RadzenStack>
+        </RadzenFieldset>
+
+        <RadzenFieldset Text="Billing & Schedule">
+            <RadzenStack Gap="1rem">
+                <RadzenLabel Text="Service Fee (Optional)" Component="Service"/>
+                <RadzenDropDown AllowFiltering="true" Data="@_serviceList" TextProperty="Name" ValueProperty="Id"
+                                TValue="int?" Placeholder="Select a billable service..." @bind-Value="@_model.ServiceId"
+                                Style="width:100%;" Name="Service" AllowClear="true"/>
+
+                <RadzenRow Gap="1rem">
+                    <RadzenColumn>
+                        <RadzenLabel Text="Date Administered"/>
+                        <RadzenDatePicker @bind-Value="@_model.DateAdministered" DateFormat="d" Style="width: 100%;"/>
+                    </RadzenColumn>
+                    <RadzenColumn>
+                        <RadzenLabel Text="Next Due Date"/>
+                        <RadzenDatePicker @bind-Value="@_model.NextDueDate" DateFormat="d" Style="width: 100%;"/>
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenStack>
+        </RadzenFieldset>
+    </RadzenStack>
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem" Class="rz-mt-4">
+        <RadzenButton ButtonType="ButtonType.Submit" Text="Add Vaccination"/>
+        <RadzenButton Text="Cancel" Click="@(() => DialogService.Close(null))" ButtonStyle="ButtonStyle.Light"/>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    private readonly AddVaccinationViewModel _model = new();
+    private bool _isExternal;
+    private List<InventoryItem> _inventoryItems = new();
+    private List<Service> _serviceList = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _inventoryItems = await DbContext.InventoryItems
+            .Where(i => i.Category == "Vaccine")
+            .AsNoTracking()
+            .ToListAsync();
+
+        _serviceList = await DbContext.Services
+            .Where(s => s.ServiceCategory.Name == "Vaccination")
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    private void OnProductSelected(object value)
+    {
+        if (value is int inventoryId)
+        {
+            var selectedItem = _inventoryItems.FirstOrDefault(i => i.Id == inventoryId);
+            if (selectedItem != null)
+            {
+                _model.VaccineName = selectedItem.Name;
+            }
+        }
+    }
+
+    private void OnSubmit(AddVaccinationViewModel model)
+    {
+        if (_isExternal)
+        {
+            model.InventoryItemId = null;
+        }
+
+        DialogService.Close(model);
+    }
+
+}

@@ -1,0 +1,80 @@
+@page "/invoices"
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin, Receptionist")]
+@inject ClinicDbContext DbContext
+@inject NavigationManager NavigationManager
+
+<PageTitle>Invoicing</PageTitle>
+
+<RadzenCard>
+    <RadzenRow AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
+        <RadzenColumn Size="6">
+            <RadzenText Text="All Invoices" TextStyle="TextStyle.H3" TagName="TagName.H1"/>
+        </RadzenColumn>
+        <RadzenColumn Size="6" class="rz-text-align-right">
+            @* We will wire this up in a future step to handle retail sales *@
+            <RadzenButton Text="Create New Invoice" Icon="add_circle_outline" Disabled="true"/>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenDataGrid @ref="invoicesGrid" Data="@_invoiceList" TItem="Invoice"
+                    AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                    AllowPaging="true" PageSize="10"
+                    AllowSorting="true">
+        <Columns>
+            <RadzenDataGridColumn TItem="Invoice" Property="Id" Title="Invoice #" Width="120px"/>
+            <RadzenDataGridColumn TItem="Invoice" Property="InvoiceDate" Title="Date" FormatString="{0:d}"
+                                  Width="150px"/>
+
+            <RadzenDataGridColumn TItem="Invoice" Property="Client.LastName" Title="Client">
+                <Template Context="invoice">
+                    @invoice.Client.FirstName @invoice.Client.LastName
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="Invoice" Property="TotalAmount" Title="Total" FormatString="{0:C}"
+                                  TextAlign="TextAlign.Right" Width="140px"/>
+            <RadzenDataGridColumn TItem="Invoice" Property="BalanceDue" Title="Balance Due" FormatString="{0:C}"
+                                  TextAlign="TextAlign.Right" Width="140px"/>
+
+            <RadzenDataGridColumn TItem="Invoice" Property="Status" Title="Status" Width="120px">
+                <Template Context="invoice">
+                    <RadzenBadge BadgeStyle="@(invoice.Status == "Paid" ? BadgeStyle.Success : BadgeStyle.Warning)"
+                                 Text="@invoice.Status"/>
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="Invoice" Title="" Sortable="false" Filterable="false"
+                                  TextAlign="TextAlign.Center" Width="80px">
+                <Template Context="invoice">
+                    <RadzenButton ButtonStyle="ButtonStyle.Info" Icon="visibility" Size="ButtonSize.Small"
+                                  Click="@(() => ViewDetails(invoice))"/>
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</RadzenCard>
+
+@code {
+    private RadzenDataGrid<Invoice>? invoicesGrid;
+    private List<Invoice> _invoiceList = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _invoiceList = await DbContext.Invoices
+            .Include(i => i.Client)
+            .OrderByDescending(i => i.InvoiceDate)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    private void ViewDetails(Invoice invoice)
+    {
+        NavigationManager.NavigateTo($"/invoice-details/{invoice.Id}");
+    }
+
+}

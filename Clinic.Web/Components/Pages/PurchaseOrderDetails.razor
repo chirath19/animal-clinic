@@ -1,0 +1,217 @@
+@page "/purchase-order-details/{PurchaseOrderId:int}"
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.ViewModels
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin, Receptionist")]
+@inject ClinicDbContext DbContext
+@inject NavigationManager NavigationManager
+@inject NotificationService NotificationService
+
+<PageTitle>Purchase Order Details</PageTitle>
+
+@if (_order == null)
+{
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate"/>
+}
+else
+{
+    <RadzenCard>
+        <RadzenRow AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+            <RadzenColumn Size="8">
+                <RadzenText Text="@($"Purchase Order #{_order.Id}")" TextStyle="TextStyle.H5" TagName="TagName.H2"/>
+                <RadzenText Text="@($"Supplier: {_order.Supplier.Name} | Status: {_order.Status}")"
+                            TextStyle="TextStyle.Subtitle1"/>
+            </RadzenColumn>
+            <RadzenColumn Size="4" class="rz-text-align-right">
+                @if (_order.Status != "Received")
+                {
+                    <RadzenButton Text="Receive Shipment" Click="ReceiveShipment" ButtonStyle="ButtonStyle.Success"
+                                  Icon="inventory"/>
+                }
+                <RadzenButton Text="Back to Orders" Click="@(() => NavigationManager.NavigateTo("/purchase-orders"))"
+                              Icon="arrow_back" ButtonStyle="ButtonStyle.Secondary" Class="rz-ms-2"/>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenCard>
+
+    <div class="row mt-4">
+        <div class="col-md-8">
+            <RadzenCard class="mb-4">
+                <RadzenText Text="Order Items" TextStyle="TextStyle.H6" class="rz-mb-4"/>
+                <RadzenDataGrid Data="@_order.PurchaseOrderItems" TItem="PurchaseOrderItem" AllowPaging="false">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="PurchaseOrderItem" Property="InventoryItem.Name" Title="Product"/>
+                        <RadzenDataGridColumn TItem="PurchaseOrderItem" Property="QuantityOrdered" Title="Qty Ordered"
+                                              Width="120px" TextAlign="TextAlign.Center"/>
+                        <RadzenDataGridColumn TItem="PurchaseOrderItem" Property="CostPerItem" Title="Cost Per Item"
+                                              FormatString="{0:C}" Width="160px" TextAlign="TextAlign.Right"/>
+                        <RadzenDataGridColumn TItem="PurchaseOrderItem" Title="Total Cost" Width="160px"
+                                              TextAlign="TextAlign.Right">
+                            <Template Context="item">
+                                @((item.QuantityOrdered * item.CostPerItem).ToString("C"))
+                            </Template>
+                        </RadzenDataGridColumn>
+                    </Columns>
+                </RadzenDataGrid>
+            </RadzenCard>
+        </div>
+        <div class="col-md-4">
+            @if (_order.Status != "Received")
+            {
+                <RadzenCard class="mb-4">
+                    <RadzenText Text="Add Item to Order" TextStyle="TextStyle.H6" class="rz-mb-4"/>
+                    <RadzenTemplateForm TItem="PurchaseOrderItem" Data="@_newItem" Submit="HandleAddItem">
+                        <RadzenStack Gap="1rem">
+                            <RadzenDropDown AllowFiltering="true" Data="@_inventoryItems" TextProperty="Name"
+                                            ValueProperty="Id"
+                                            Placeholder="Search for a product..."
+                                            @bind-Value="@_newItem.InventoryItemId" Style="width:100%;"/>
+                            <RadzenNumeric TValue="int" @bind-Value="@_newItem.QuantityOrdered" Placeholder="Quantity"
+                                           Style="width:100%;"/>
+                            <RadzenNumeric TValue="decimal" @bind-Value="@_newItem.CostPerItem"
+                                           Placeholder="Cost Per Item" Format="C" Style="width:100%;"/>
+                            <RadzenButton ButtonType="ButtonType.Submit" Text="Add Item"
+                                          ButtonStyle="ButtonStyle.Primary"/>
+                        </RadzenStack>
+                    </RadzenTemplateForm>
+                </RadzenCard>
+            }
+
+            @* --- START: Payment Management Section --- *@
+            <RadzenCard>
+                <RadzenText Text="Payment Summary" TextStyle="TextStyle.H6" class="rz-mb-4"/>
+                <RadzenRow>
+                    <RadzenColumn>
+                        <RadzenText TextStyle="TextStyle.Subtitle1">Total Cost:</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn class="rz-text-align-right">
+                        <RadzenText TextStyle="TextStyle.Subtitle1">@_order.TotalCost.ToString("C")</RadzenText>
+                    </RadzenColumn>
+                </RadzenRow>
+                <RadzenRow>
+                    <RadzenColumn>
+                        <RadzenText TextStyle="TextStyle.Subtitle1">Amount Paid:</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn class="rz-text-align-right">
+                        <RadzenText TextStyle="TextStyle.Subtitle1">@_order.PaidAmount.ToString("C")</RadzenText>
+                    </RadzenColumn>
+                </RadzenRow>
+                <hr/>
+                <RadzenRow>
+                    <RadzenColumn>
+                        <RadzenText TextStyle="TextStyle.H6">Balance Due:</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn class="rz-text-align-right">
+                        <RadzenText TextStyle="TextStyle.H6"
+                                    Style="@(_order.BalanceDue > 0 ? "color: var(--rz-danger);" : "color: var(--rz-success);")">@_order.BalanceDue.ToString("C")</RadzenText>
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenCard>
+
+            @if (_order.BalanceDue > 0)
+            {
+                <RadzenCard class="mt-4">
+                    <RadzenText Text="Record Payment to Supplier" TextStyle="TextStyle.H6" class="rz-mb-4"/>
+                    <RadzenTemplateForm TItem="RecordPaymentViewModel" Data="@_paymentModel" Submit="HandlePayment">
+                        <RadzenStack Gap="1rem">
+                            <RadzenNumeric TValue="decimal" @bind-Value="@_paymentModel.Amount"
+                                           Placeholder="Amount Paid" Format="C" Style="width:100%;"/>
+                            <RadzenButton Text="Pay Full Balance" Click="PayFullBalance"
+                                          ButtonStyle="ButtonStyle.Secondary"/>
+                            <RadzenButton ButtonType="ButtonType.Submit" Text="Record Payment"
+                                          ButtonStyle="ButtonStyle.Success"/>
+                        </RadzenStack>
+                    </RadzenTemplateForm>
+                </RadzenCard>
+            }
+            @* --- END: Payment Management Section --- *@
+        </div>
+    </div>
+}
+
+
+@code {
+    [Parameter] public int PurchaseOrderId { get; set; }
+
+    private PurchaseOrder? _order;
+    private List<InventoryItem> _inventoryItems = new();
+    private PurchaseOrderItem _newItem = new();
+    private RecordPaymentViewModel _paymentModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _inventoryItems = await DbContext.InventoryItems.AsNoTracking().ToListAsync();
+        await LoadOrder();
+    }
+
+    private async Task LoadOrder()
+    {
+        _order = await DbContext.PurchaseOrders
+            .Include(po => po.Supplier)
+            .Include(po => po.PurchaseOrderItems)
+            .ThenInclude(poi => poi.InventoryItem)
+            .FirstOrDefaultAsync(po => po.Id == PurchaseOrderId);
+    }
+
+    private async Task HandleAddItem(PurchaseOrderItem item)
+    {
+        if (_order == null || item.InventoryItemId == 0) return;
+
+        item.PurchaseOrderId = _order.Id;
+        DbContext.PurchaseOrderItems.Add(item);
+
+        _order.TotalCost += item.QuantityOrdered * item.CostPerItem;
+
+        await DbContext.SaveChangesAsync();
+
+        _newItem = new PurchaseOrderItem();
+        await LoadOrder();
+    }
+
+    private async Task ReceiveShipment()
+    {
+        if (_order == null) return;
+
+        foreach (var item in _order.PurchaseOrderItems)
+        {
+            var inventoryItem = await DbContext.InventoryItems.FindAsync(item.InventoryItemId);
+            if (inventoryItem != null)
+            {
+                inventoryItem.QuantityInStock += item.QuantityOrdered;
+            }
+        }
+
+        _order.Status = "Received";
+        _order.ActualDeliveryDate = DateTime.UtcNow;
+
+        await DbContext.SaveChangesAsync();
+        NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Success, Summary = "Success", Detail = "Shipment received and inventory updated." });
+        await LoadOrder();
+    }
+
+    private void PayFullBalance()
+    {
+        if (_order == null) return;
+        _paymentModel.Amount = _order.BalanceDue;
+    }
+
+    private async Task HandlePayment(RecordPaymentViewModel model)
+    {
+        if (_order == null) return;
+
+        var orderToUpdate = await DbContext.PurchaseOrders.FindAsync(_order.Id);
+        if (orderToUpdate == null) return;
+
+        orderToUpdate.PaidAmount += model.Amount;
+
+        await DbContext.SaveChangesAsync();
+        NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Success, Summary = "Success", Detail = "Payment to supplier recorded." });
+
+        _paymentModel = new RecordPaymentViewModel();
+        await LoadOrder();
+    }
+
+}

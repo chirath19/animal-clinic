@@ -1,0 +1,66 @@
+@page "/all-pets"
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin, Receptionist, Veterinarian")]
+@inject ClinicDbContext DbContext
+@inject NavigationManager NavigationManager
+
+<PageTitle>All Pets</PageTitle>
+
+<RadzenCard>
+    <RadzenText Text="All Pets" TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-mb-4"/>
+
+    <RadzenDataGrid @ref="petsGrid" Data="@_allAnimals" TItem="Animal"
+                    AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                    AllowPaging="true" PageSize="10"
+                    AllowSorting="true">
+        <Columns>
+            <RadzenDataGridColumn TItem="Animal" Property="Name" Title="Pet Name" Width="160px"/>
+            <RadzenDataGridColumn TItem="Animal" Property="Species" Title="Species" Width="120px"/>
+
+            @* This column uses a template to display the owner's full name *@
+            <RadzenDataGridColumn TItem="Animal" Property="Client.LastName" Title="Owner">
+                <Template Context="animal">
+                    @animal.Client.FirstName @animal.Client.LastName
+                </Template>
+            </RadzenDataGridColumn>
+
+            @* This column uses a template for the action button *@
+            <RadzenDataGridColumn TItem="Animal" Title="Actions" Sortable="false" Filterable="false"
+                                  TextAlign="TextAlign.Center" Width="100px">
+                <Template Context="animal">
+                    <RadzenButton ButtonStyle="ButtonStyle.Info"
+                                  Icon="visibility"
+                                  Size="ButtonSize.Small"
+                                  Click="@(() => ViewDetails(animal))"
+                                  @onclick:stopPropagation="true"/>
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</RadzenCard>
+
+
+@code {
+    private RadzenDataGrid<Animal>? petsGrid;
+    private List<Animal> _allAnimals = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // The C# code still uses the 'Animal' class as requested
+        _allAnimals = await DbContext.Animals
+            .Include(p => p.Client)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    // This method is called by the "View Details" button
+    private void ViewDetails(Animal animal)
+    {
+        NavigationManager.NavigateTo($"/pet-details/{animal.Id}");
+    }
+
+}

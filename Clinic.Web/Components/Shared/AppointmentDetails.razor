@@ -1,0 +1,74 @@
+@using Clinic.Domain.Entities
+@inject DialogService DialogService
+@inject NavigationManager NavigationManager
+
+<RadzenCard>
+    <h4 class="mb-4">Appointment for @Appointment.Animal.Name</h4>
+    <div class="row">
+        <div class="col-md-6">
+            <p><strong>Client:</strong> @Appointment.Client.FirstName @Appointment.Client.LastName</p>
+            <p><strong>Pet:</strong> @Appointment.Animal.Name (@Appointment.Animal.Species)</p>
+            <p><strong>Reason:</strong> @Appointment.Service?.Name</p>
+        </div>
+        <div class="col-md-6">
+            <p><strong>Date & Time:</strong> @Appointment.AppointmentDateTime.ToString("f")</p>
+            <p><strong>With:</strong> @Appointment.Staff.FirstName @Appointment.Staff.LastName</p>
+            <p><strong>Status:</strong> @Appointment.Status</p>
+        </div>
+    </div>
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" Class="rz-mt-4">
+        <RadzenButton Text="Close" Click="@(() => DialogService.Close())" ButtonStyle="ButtonStyle.Secondary"/>
+        <RadzenButton Text="Go to Billing" Click="GoToBilling" ButtonStyle="ButtonStyle.Primary" Icon="receipt_long"/>
+        <RadzenButton Text="View Pet History" Click="ViewPetHistory" ButtonStyle="ButtonStyle.Info"/>
+
+        @* --- START: Smart Button Logic with Fix --- *@
+        @if (Appointment.Service?.ServiceCategory?.Name == "Vaccination")
+        {
+            <AuthorizeView Roles="Admin, Veterinarian, Receptionist">
+                <RadzenButton Text="Go to Vaccination" Click="GoToVaccination" ButtonStyle="ButtonStyle.Success"
+                              Icon="vaccines"/>
+            </AuthorizeView>
+        }
+        else
+        {
+            <AuthorizeView Roles="Admin, Veterinarian, Receptionist">
+                <RadzenButton
+                    Text="@(Appointment.MedicalRecord == null ? "Start Medical Record" : "View/Continue Record")"
+                    Click="GoToConsultation"
+                    ButtonStyle="ButtonStyle.Success"
+                    Icon="medical_information"/>
+            </AuthorizeView>
+        }
+        @* --- END: Smart Button Logic --- *@
+    </RadzenStack>
+</RadzenCard>
+
+@code {
+    [Parameter] public Appointment Appointment { get; set; } = null!;
+
+    private void GoToBilling()
+    {
+        NavigationManager.NavigateTo($"/appointment-billing/{Appointment.Id}");
+        DialogService.Close();
+    }
+
+    private void ViewPetHistory()
+    {
+        NavigationManager.NavigateTo($"/pet-details/{Appointment.AnimalId}");
+        DialogService.Close();
+    }
+
+    private void GoToConsultation()
+    {
+        NavigationManager.NavigateTo($"/consultation/{Appointment.Id}");
+        DialogService.Close();
+    }
+
+    private void GoToVaccination()
+    {
+        NavigationManager.NavigateTo($"/vaccination-consultation/{Appointment.Id}");
+        DialogService.Close();
+    }
+
+}

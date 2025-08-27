@@ -1,0 +1,35 @@
+@using Clinic.Domain.Entities
+@inject DialogService DialogService
+
+<RadzenStack Gap="1.5rem">
+    <RadzenStack Gap="0.5rem">
+        <RadzenLabel Text="Select an appointment to add a record for:" Component="Appointment"/>
+
+        @* The fix is to add ValueProperty="Id" to the dropdown *@
+        <RadzenDropDown @bind-Value="@_selectedAppointmentId" Data="@Appointments" TValue="int" ValueProperty="Id"
+                        Style="width: 100%;" Name="Appointment">
+            <Template Context="appointment">
+                @((appointment as Appointment)?.AppointmentDateTime.ToString("f")) - @((appointment as Appointment)?.Reason)
+            </Template>
+        </RadzenDropDown>
+    </RadzenStack>
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem" Class="rz-mt-2">
+        <RadzenButton Text="Continue" Click="Select" ButtonStyle="ButtonStyle.Primary"
+                      Disabled="@(_selectedAppointmentId == 0)"/>
+        <RadzenButton Text="Cancel" Click="@(() => DialogService.Close(null))" ButtonStyle="ButtonStyle.Light"/>
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    [Parameter] public List<Appointment> Appointments { get; set; } = new();
+
+    private int _selectedAppointmentId;
+
+    private void Select()
+    {
+        var selectedAppointment = Appointments.FirstOrDefault(a => a.Id == _selectedAppointmentId);
+        DialogService.Close(selectedAppointment);
+    }
+
+}

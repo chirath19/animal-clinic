@@ -1,0 +1,55 @@
+@using Clinic.Domain.Entities
+@inject DialogService DialogService
+
+<RadzenTemplateForm TItem="VaccinationRecord" Data="@VaccinationRecord" Submit="@OnSubmit">
+    <RadzenStack Gap="1.5rem">
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Vaccine Name" Component="VaccineName"/>
+            <RadzenTextBox @bind-Value="@VaccinationRecord.VaccineName" Name="VaccineName" Style="width: 100%;"/>
+            <RadzenRequiredValidator Component="VaccineName" Text="Vaccine name is required"/>
+        </RadzenStack>
+
+        <RadzenStack Gap="0.5rem">
+            <RadzenLabel Text="Batch Number" Component="BatchNumber"/>
+            <RadzenTextBox @bind-Value="@VaccinationRecord.BatchNumber" Name="BatchNumber" Style="width: 100%;"/>
+        </RadzenStack>
+
+        <RadzenRow Gap="1rem">
+            <RadzenColumn>
+                <RadzenLabel Text="Date Administered" Component="DateAdministered"/>
+                <RadzenDatePicker @bind-Value="@VaccinationRecord.DateAdministered" Name="DateAdministered"
+                                  DateFormat="d" Style="width: 100%;"/>
+            </RadzenColumn>
+            <RadzenColumn>
+                <RadzenLabel Text="Next Due Date" Component="NextDueDate"/>
+                <RadzenDatePicker @bind-Value="@VaccinationRecord.NextDueDate" Name="NextDueDate" DateFormat="d"
+                                  Style="width: 100%;"/>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenStack>
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem" Class="rz-mt-4">
+        <RadzenButton ButtonType="ButtonType.Submit" Text="Save"/>
+        <RadzenButton Text="Cancel" Click="@(() => DialogService.Close(null))" ButtonStyle="ButtonStyle.Light"/>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter] public VaccinationRecord VaccinationRecord { get; set; } = new();
+
+    protected override void OnInitialized()
+    {
+        // Set default dates for a new record
+        if (VaccinationRecord.Id == 0)
+        {
+            VaccinationRecord.DateAdministered = DateTime.Today;
+            VaccinationRecord.NextDueDate = DateTime.Today.AddYears(1);
+        }
+    }
+
+    private void OnSubmit(VaccinationRecord record)
+    {
+        DialogService.Close(record);
+    }
+
+}

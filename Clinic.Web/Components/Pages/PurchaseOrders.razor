@@ -1,0 +1,85 @@
+@page "/purchase-orders"
+@using Clinic.Domain.Entities
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.Components.Shared
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin, Receptionist")]
+@inject ClinicDbContext DbContext
+@inject NavigationManager NavigationManager
+@inject DialogService DialogService
+
+<PageTitle>Purchase Orders</PageTitle>
+
+<RadzenCard>
+    <RadzenRow AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
+        <RadzenColumn Size="6">
+            <RadzenText Text="Purchase Orders" TextStyle="TextStyle.H3" TagName="TagName.H1"/>
+        </RadzenColumn>
+        <RadzenColumn Size="6" class="rz-text-align-right">
+            <RadzenButton Text="Create New PO" Icon="add_circle_outline" Click="CreateNewOrder"/>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenDataGrid Data="@_orderList" TItem="PurchaseOrder" AllowPaging="true" AllowSorting="true"
+                    AllowFiltering="true">
+        <Columns>
+            <RadzenDataGridColumn TItem="PurchaseOrder" Property="Id" Title="PO #" Width="100px"/>
+            <RadzenDataGridColumn TItem="PurchaseOrder" Property="OrderDate" Title="Order Date" FormatString="{0:d}"
+                                  Width="150px"/>
+            <RadzenDataGridColumn TItem="PurchaseOrder" Property="Supplier.Name" Title="Supplier"/>
+            <RadzenDataGridColumn TItem="PurchaseOrder" Property="Status" Title="Status" Width="140px"/>
+            <RadzenDataGridColumn TItem="PurchaseOrder" Property="TotalCost" Title="Total Cost" FormatString="{0:C}"
+                                  Width="160px" TextAlign="TextAlign.Right"/>
+            <RadzenDataGridColumn TItem="PurchaseOrder" Title="" Sortable="false" Filterable="false"
+                                  TextAlign="TextAlign.Center" Width="80px">
+                <Template Context="order">
+                    <RadzenButton ButtonStyle="ButtonStyle.Info" Icon="visibility" Size="ButtonSize.Small"
+                                  Click="@(() => ViewDetails(order))"/>
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</RadzenCard>
+
+@code {
+    private List<PurchaseOrder> _orderList = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _orderList = await DbContext.PurchaseOrders
+            .Include(po => po.Supplier)
+            .OrderByDescending(po => po.OrderDate)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    private async Task CreateNewOrder()
+    {
+        // For creating a new PO, we can use a dialog to select the supplier first
+        var supplier = await DialogService.OpenAsync<SelectSupplierDialog>("Select Supplier");
+
+        if (supplier is Supplier selectedSupplier)
+        {
+            var newOrder = new PurchaseOrder
+            {
+                SupplierId = selectedSupplier.Id,
+                OrderDate = DateTime.UtcNow,
+                Status = "Draft"
+            };
+
+            await DbContext.PurchaseOrders.AddAsync(newOrder);
+            await DbContext.SaveChangesAsync();
+
+            // Navigate to the details page to add items
+            NavigationManager.NavigateTo($"/purchase-order-details/{newOrder.Id}");
+        }
+    }
+
+    private void ViewDetails(PurchaseOrder order)
+    {
+        NavigationManager.NavigateTo($"/purchase-order-details/{order.Id}");
+    }
+
+}

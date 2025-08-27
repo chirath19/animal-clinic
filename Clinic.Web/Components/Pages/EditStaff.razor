@@ -1,0 +1,123 @@
+@page "/edit-staff/{StaffId:int}"
+@using Clinic.Common
+@using Clinic.Infrastructure.Persistence
+@using Clinic.Web.ViewModels
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin")]
+@inject ClinicDbContext DbContext
+@inject UserManager<ApplicationUser> UserManager
+@inject RoleManager<IdentityRole> RoleManager
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit Staff Member</PageTitle>
+
+<h1>Edit Staff Member</h1>
+
+@if (_staffModel == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <EditForm Model="_staffModel" OnValidSubmit="HandleUpdate" FormName="EditStaff">
+        <DataAnnotationsValidator/>
+        <ValidationSummary/>
+
+        <div class="mb-3">
+            <label class="form-label">Email (cannot be changed)</label>
+            <InputText class="form-control" @bind-Value="_staffModel.Email" disabled/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">First Name</label>
+            <InputText class="form-control" @bind-Value="_staffModel.FirstName"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Last Name</label>
+            <InputText class="form-control" @bind-Value="_staffModel.LastName"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Assign Role</label>
+            <InputSelect class="form-select" @bind-Value="_staffModel.Role">
+                @foreach (var role in _roleList)
+                {
+                    <option value="@role">@role</option>
+                }
+            </InputSelect>
+        </div>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <a href="/staff-management" class="btn btn-secondary">Cancel</a>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int StaffId { get; set; }
+
+    private EditStaffViewModel? _staffModel;
+    private List<string> _roleList = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Get all roles except "Client" to populate the dropdown
+        _roleList = await RoleManager.Roles
+            .Where(r => r.Name != "Client")
+            .Select(r => r.Name!)
+            .ToListAsync();
+
+        // Find the staff record and its associated user account
+        var staff = await DbContext.Staff
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == StaffId);
+
+        if (staff != null)
+        {
+            var user = await UserManager.FindByIdAsync(staff.ApplicationUserId!);
+            if (user != null)
+            {
+                var userRoles = await UserManager.GetRolesAsync(user);
+                _staffModel = new EditStaffViewModel
+                {
+                    Id = staff.Id,
+                    FirstName = staff.FirstName,
+                    LastName = staff.LastName,
+                    Email = user.Email!,
+                    Role = userRoles.FirstOrDefault() ?? string.Empty
+                };
+            }
+        }
+    }
+
+    private async Task HandleUpdate()
+    {
+        if (_staffModel == null) return;
+
+        var staffToUpdate = await DbContext.Staff.FindAsync(_staffModel.Id);
+        if (staffToUpdate == null) return;
+
+        // Update Staff entity
+        staffToUpdate.FirstName = _staffModel.FirstName;
+        staffToUpdate.LastName = _staffModel.LastName;
+        staffToUpdate.Role = _staffModel.Role;
+
+        // Update the associated ApplicationUser
+        var user = await UserManager.FindByIdAsync(staffToUpdate.ApplicationUserId!);
+        if (user != null)
+
+        {
+            user.FirstName = _staffModel.FirstName;
+            user.LastName = _staffModel.LastName;
+            await UserManager.UpdateAsync(user);
+
+            // Update the user's role
+            var currentRoles = await UserManager.GetRolesAsync(user);
+            await UserManager.RemoveFromRolesAsync(user, currentRoles);
+            await UserManager.AddToRoleAsync(user, _staffModel.Role);
+        }
+
+        await DbContext.SaveChangesAsync();
+        NavigationManager.NavigateTo("/staff-management");
+    }
+
+}
