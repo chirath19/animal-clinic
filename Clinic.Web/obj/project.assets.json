@@ -8687,19 +8687,19 @@
     ]
   },
   "packageFolders": {
-    "/home/chirath/.nuget/packages/": {}
+    "/home/codespace/.nuget/packages/": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/home/chirath/RiderProjects/AnimalClinic/Clinic.Web/Clinic.Web.csproj",
+      "projectUniqueName": "/workspaces/animal-clinic/Clinic.Web/Clinic.Web.csproj",
       "projectName": "Clinic.Web",
-      "projectPath": "/home/chirath/RiderProjects/AnimalClinic/Clinic.Web/Clinic.Web.csproj",
-      "packagesPath": "/home/chirath/.nuget/packages/",
-      "outputPath": "/home/chirath/RiderProjects/AnimalClinic/Clinic.Web/obj/",
+      "projectPath": "/workspaces/animal-clinic/Clinic.Web/Clinic.Web.csproj",
+      "packagesPath": "/home/codespace/.nuget/packages/",
+      "outputPath": "/workspaces/animal-clinic/Clinic.Web/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "/home/chirath/.nuget/NuGet/NuGet.Config"
+        "/home/codespace/.nuget/NuGet/NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net8.0"
@@ -8711,11 +8711,11 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "/home/chirath/RiderProjects/AnimalClinic/Clinic.Common/Clinic.Common.csproj": {
-              "projectPath": "/home/chirath/RiderProjects/AnimalClinic/Clinic.Common/Clinic.Common.csproj"
+            "/workspaces/animal-clinic/Clinic.Common/Clinic.Common.csproj": {
+              "projectPath": "/workspaces/animal-clinic/Clinic.Common/Clinic.Common.csproj"
             },
-            "/home/chirath/RiderProjects/AnimalClinic/Clinic.Infrastructure/Clinic.Infrastructure.csproj": {
-              "projectPath": "/home/chirath/RiderProjects/AnimalClinic/Clinic.Infrastructure/Clinic.Infrastructure.csproj"
+            "/workspaces/animal-clinic/Clinic.Infrastructure/Clinic.Infrastructure.csproj": {
+              "projectPath": "/workspaces/animal-clinic/Clinic.Infrastructure/Clinic.Infrastructure.csproj"
             }
           }
         }
@@ -8729,8 +8729,7 @@
         "enableAudit": "true",
         "auditLevel": "low",
         "auditMode": "direct"
-      },
-      "SdkAnalysisLevel": "9.0.300"
+      }
     },
     "frameworks": {
       "net8.0": {
@@ -8786,7 +8785,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/9.0.304/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/8.0.412/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

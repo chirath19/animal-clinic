@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "/home/chirath/RiderProjects/AnimalClinic/Clinic.Domain/Clinic.Domain.csproj": {}
+    "/workspaces/animal-clinic/Clinic.Domain/Clinic.Domain.csproj": {}
   },
   "projects": {
-    "/home/chirath/RiderProjects/AnimalClinic/Clinic.Domain/Clinic.Domain.csproj": {
+    "/workspaces/animal-clinic/Clinic.Domain/Clinic.Domain.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/home/chirath/RiderProjects/AnimalClinic/Clinic.Domain/Clinic.Domain.csproj",
+        "projectUniqueName": "/workspaces/animal-clinic/Clinic.Domain/Clinic.Domain.csproj",
         "projectName": "Clinic.Domain",
-        "projectPath": "/home/chirath/RiderProjects/AnimalClinic/Clinic.Domain/Clinic.Domain.csproj",
-        "packagesPath": "/home/chirath/.nuget/packages/",
-        "outputPath": "/home/chirath/RiderProjects/AnimalClinic/Clinic.Domain/obj/",
+        "projectPath": "/workspaces/animal-clinic/Clinic.Domain/Clinic.Domain.csproj",
+        "packagesPath": "/home/codespace/.nuget/packages/",
+        "outputPath": "/workspaces/animal-clinic/Clinic.Domain/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "/home/chirath/.nuget/NuGet/NuGet.Config"
+          "/home/codespace/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
@@ -37,8 +37,7 @@
           "enableAudit": "true",
           "auditLevel": "low",
           "auditMode": "direct"
-        },
-        "SdkAnalysisLevel": "9.0.300"
+        }
       },
       "frameworks": {
         "net8.0": {
@@ -59,7 +58,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/9.0.304/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/8.0.412/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

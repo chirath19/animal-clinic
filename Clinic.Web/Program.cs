@@ -5,6 +5,7 @@ using Clinic.Infrastructure.Persistence;
 using Clinic.Web.Components;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.UI.Services; // <-- Add this
 using Radzen;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -35,6 +36,10 @@ builder.Services.AddRadzenComponents();
 builder.Services.AddCascadingAuthenticationState();
 
 
+// ✅ Fix: Register a dummy IEmailSender so Identity can resolve it
+builder.Services.AddTransient<IEmailSender, DummyEmailSender>();
+
+
 var app = builder.Build();
 
 // Seed the data
@@ -61,3 +66,16 @@ app.MapRazorComponents<App>()
 app.MapRazorPages();
 
 app.Run();
+
+
+// -----------------
+// Dummy EmailSender
+// -----------------
+public class DummyEmailSender : IEmailSender
+{
+    public Task SendEmailAsync(string email, string subject, string htmlMessage)
+    {
+        Console.WriteLine($"[EmailSender] To: {email}, Subject: {subject}, Message: {htmlMessage}");
+        return Task.CompletedTask;
+    }
+}

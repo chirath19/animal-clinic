@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "CntOafV2cE8=",
+  "dgSpecHash": "JpWaQ1Kym9k=",
   "success": true,
-  "projectFilePath": "/home/chirath/RiderProjects/AnimalClinic/Clinic.Domain/Clinic.Domain.csproj",
+  "projectFilePath": "/workspaces/animal-clinic/Clinic.Domain/Clinic.Domain.csproj",
   "expectedPackageFiles": [],
   "logs": []
 }

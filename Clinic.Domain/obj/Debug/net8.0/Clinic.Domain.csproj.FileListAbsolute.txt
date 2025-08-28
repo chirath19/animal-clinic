@@ -9,3 +9,15 @@
 /home/chirath/RiderProjects/AnimalClinic/Clinic.Domain/obj/Debug/net8.0/refint/Clinic.Domain.dll
 /home/chirath/RiderProjects/AnimalClinic/Clinic.Domain/obj/Debug/net8.0/Clinic.Domain.pdb
 /home/chirath/RiderProjects/AnimalClinic/Clinic.Domain/obj/Debug/net8.0/ref/Clinic.Domain.dll
+/workspaces/animal-clinic/Clinic.Domain/bin/Debug/net8.0/Clinic.Domain.deps.json
+/workspaces/animal-clinic/Clinic.Domain/bin/Debug/net8.0/Clinic.Domain.dll
+/workspaces/animal-clinic/Clinic.Domain/bin/Debug/net8.0/Clinic.Domain.pdb
+/workspaces/animal-clinic/Clinic.Domain/obj/Debug/net8.0/Clinic.Domain.GeneratedMSBuildEditorConfig.editorconfig
+/workspaces/animal-clinic/Clinic.Domain/obj/Debug/net8.0/Clinic.Domain.AssemblyInfoInputs.cache
+/workspaces/animal-clinic/Clinic.Domain/obj/Debug/net8.0/Clinic.Domain.AssemblyInfo.cs
+/workspaces/animal-clinic/Clinic.Domain/obj/Debug/net8.0/Clinic.Domain.csproj.CoreCompileInputs.cache
+/workspaces/animal-clinic/Clinic.Domain/obj/Debug/net8.0/Clinic.Domain.sourcelink.json
+/workspaces/animal-clinic/Clinic.Domain/obj/Debug/net8.0/Clinic.Domain.dll
+/workspaces/animal-clinic/Clinic.Domain/obj/Debug/net8.0/refint/Clinic.Domain.dll
+/workspaces/animal-clinic/Clinic.Domain/obj/Debug/net8.0/Clinic.Domain.pdb
+/workspaces/animal-clinic/Clinic.Domain/obj/Debug/net8.0/ref/Clinic.Domain.dll
