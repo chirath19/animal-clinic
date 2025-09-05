@@ -92,19 +92,29 @@ else
     }
 
     private async Task LoadData()
-    {
-        
-        _appointment = await DbContext.Appointments
-            .AsNoTracking()
-            .Include(a => a.Client)
-            .Include(a => a.Animal).ThenInclude(p => p.VaccinationRecords)
-            .FirstOrDefaultAsync(a => a.Id == AppointmentId);
+{
+    _appointment = await DbContext.Appointments
+        .AsNoTracking()
+        .Include(a => a.Client)
+        .Include(a => a.Animal).ThenInclude(p => p.VaccinationRecords)
+        .Include(a => a.Invoices).ThenInclude(i => i.InvoiceItems) // Important: Include invoices
+        .FirstOrDefaultAsync(a => a.Id == AppointmentId);
 
-        if (_appointment != null)
+    if (_appointment != null)
+    {
+        _animal = _appointment.Animal;
+
+        // Check if consultation has been paid
+        var consultationInvoice = _appointment.Invoices
+            .FirstOrDefault(i => i.Status == "Consultation" || i.Status == "Single");
+
+        if (consultationInvoice == null || consultationInvoice.BalanceDue > 0)
         {
-            _animal = _appointment.Animal;
+            NotificationService.Notify(NotificationSeverity.Warning, "Payment Required", "Please pay the consultation fee before proceeding.");
+            NavigationManager.NavigateTo($"/appointment-billing/{AppointmentId}");
         }
     }
+}
 
     private async Task OpenVaccinationDialog(VaccinationRecord? vaccine = null)
     {

@@ -254,24 +254,36 @@ else
     }
 
     private async Task LoadData()
-    {
-        // This single, comprehensive query fixes the data loading and UI refresh issues.
-        // By removing .AsNoTracking(), we ensure Entity Framework tracks all changes.
-        _appointment = await DbContext.Appointments
-            .AsNoTracking()
-            .Include(a => a.Client)
-            .Include(a => a.Animal).ThenInclude(p => p.VaccinationRecords).ThenInclude(vr => vr.Staff)
-            .Include(a => a.MedicalRecord).ThenInclude(mr => mr.Prescriptions)
-            .Include(a => a.MedicalRecord).ThenInclude(mr => mr.Administrations)
-            .Include(a => a.MedicalRecord).ThenInclude(mr => mr.SurgicalHistories).ThenInclude(sh => sh.Staff)
-            .FirstOrDefaultAsync(a => a.Id == AppointmentId);
+{
+    _appointment = await DbContext.Appointments
+        .AsNoTracking()
+        .Include(a => a.Client)
+        .Include(a => a.Animal).ThenInclude(p => p.VaccinationRecords).ThenInclude(vr => vr.Staff)
+        .Include(a => a.MedicalRecord).ThenInclude(mr => mr.Prescriptions)
+        .Include(a => a.MedicalRecord).ThenInclude(mr => mr.Administrations)
+        .Include(a => a.MedicalRecord).ThenInclude(mr => mr.SurgicalHistories).ThenInclude(sh => sh.Staff)
+        .Include(a => a.Invoices).ThenInclude(i => i.InvoiceItems)
+        .FirstOrDefaultAsync(a => a.Id == AppointmentId);
 
-        if (_appointment != null)
+    if (_appointment != null)
+    {
+        _medicalRecord = _appointment.MedicalRecord;
+        _animal = _appointment.Animal;
+
+        // --- CORRECTED LOGIC ---
+        // Find the specific invoice by its permanent type, not its changing status.
+        var consultationInvoice = _appointment.Invoices
+            .FirstOrDefault(i => i.InvoiceType == "Consultation");
+
+        // Check if the invoice exists and if there is still a balance due.
+        if (consultationInvoice == null || consultationInvoice.BalanceDue > 0)
         {
-            _medicalRecord = _appointment.MedicalRecord;
-            _animal = _appointment.Animal;
+            NotificationService.Notify(NotificationSeverity.Warning, "Payment Required", "Please pay the consultation fee before proceeding.");
+            NavigationManager.NavigateTo($"/appointment-billing/{AppointmentId}");
+            return; // Stop further execution
         }
     }
+}
 
     private async Task StartMedicalRecord()
     {

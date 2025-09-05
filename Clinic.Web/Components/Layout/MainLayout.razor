@@ -1,23 +1,14 @@
 ﻿@inherits LayoutComponentBase
 
 <RadzenLayout>
-    <RadzenSidebar>
-        <div class="d-flex align-items-center p-2">
-            <RadzenImage Path="favicon.png" Style="width: 48px; height: 48px;"/>
-            <RadzenText Text="Animal Clinic" TextStyle="TextStyle.H5" class="ms-2"/>
-        </div>
-
-        @* The NavMenu component is placed inside the sidebar *@
+    <RadzenSidebar > 
         <NavMenu @rendermode="InteractiveServer"/>
-
     </RadzenSidebar>
+
     <RadzenBody>
-
-
         <div class="rz-p-4">
             @Body
         </div>
-
     </RadzenBody>
 </RadzenLayout>
 
@@ -28,7 +19,6 @@
 </div>
 <RadzenComponents @rendermode="InteractiveServer"/>
 
-@* The Radzen placeholder components are best placed at the end *@
 <RadzenDialog/>
 <RadzenNotification/>
 <RadzenContextMenu/>

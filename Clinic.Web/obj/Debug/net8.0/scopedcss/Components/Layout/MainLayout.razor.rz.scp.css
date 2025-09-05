@@ -1,144 +1,33 @@
-.page[b-px5a4qzpdx] {
-    position: relative;
-    display: flex;
-    flex-direction: column;
+/* --- MainLayout.razor.css --- */
+
+/* This rule targets the RadzenSidebar component from within the MainLayout component.
+   The ::deep selector is crucial for the styles to apply correctly. */
+[b-px5a4qzpdx].rz-sidebar {
+    /* --- OVERRIDE THEME DEFAULTS --- */
+    /* This is the key. We are overriding the sidebar's background color
+       provided by the material-dark theme with our custom dark blue. */
+    --rz-sidebar-background-color: #0045ad;
+
+    /* We also override the menu item colors to ensure they are readable
+       against our new custom background. */
+    --rz-panel-menu-item-color: #c9d1d9; /* Text color */
+    --rz-panel-menu-item-icon-color: #8b949e; /* Icon color */
+
+    /* Override the hover state colors */
+    --rz-panel-menu-item-hover-background-color: #9c0000;
+    --rz-panel-menu-item-hover-color: #f0f6fc;
+    --rz-panel-menu-item-hover-icon-color: #f0f6fc;
+
+    /* The active item often uses the theme's primary color by default.
+       If you want to force it to be a specific color, you can override it here.
+       Otherwise, you can leave these commented out to use the theme's accent color. */
+    /* --rz-panel-menu-item-active-background-color: #007bff; */
+    /* --rz-panel-menu-item-active-color: #ffffff; */
+    /* --rz-panel-menu-item-active-icon-color: #ffffff; */
 }
 
-/* This makes the main content area take up the remaining space */
-main[b-px5a4qzpdx] {
-    flex: 1;
-}
-
-/* --- Dark Sidebar Styles --- */
-
-/* The ::deep selector is needed to style the inner parts of a Blazor component */
-
-/* Set the sidebar's background color */
-[b-px5a4qzpdx] .rz-sidebar {
-    background-color: #272727; /* A modern dark grey */
-}
-
-/* Style the text and icons of the menu items */
-[b-px5a4qzpdx] .rz-sidebar .rz-panel-menu .rz-navigation-item-text,
-[b-px5a4qzpdx] .rz-sidebar .rz-panel-menu .rz-navigation-item-icon {
-    color: #f5f5f5; /* A light grey for easy reading */
-}
-
-/* Style the expand/collapse icon for parent menu items */
-[b-px5a4qzpdx] .rz-sidebar .rz-panel-menu .rz-navigation-item-icon-children {
-    color: #f5f5f5;
-}
-
-/* Style the menu item when you hover over it or when it's the active page */
-[b-px5a4qzpdx] .rz-sidebar .rz-panel-menu .rz-navigation-item.rz-state-active > .rz-navigation-item-link,
-[b-px5a4qzpdx] .rz-sidebar .rz-panel-menu .rz-navigation-item-link:hover {
-    background-color: #3a3a3a; /* A slightly lighter dark grey */
-}
-
-/* Remove the default top and bottom borders from the panel menu */
-[b-px5a4qzpdx] .rz-sidebar .rz-panel-menu.rz-menu {
-    border-top: none;
-    border-bottom: none;
-}
-
-#blazor-error-ui[b-px5a4qzpdx] {
-    background: lightyellow;
-    bottom: 0;
-    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
-    display: none;
-    left: 0;
-    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
-    position: fixed;
-    width: 100%;
-    z-index: 1000;
-}
-
-#blazor-error-ui .dismiss[b-px5a4qzpdx] {
-    cursor: pointer;
-    position: absolute;
-    right: 0.75rem;
-    top: 0.5rem;
-}
-
-.top-row[b-px5a4qzpdx] {
-    background-color: #f7f7f7;
-    border-bottom: 1px solid #d6d5d5;
-    justify-content: flex-end;
-    height: 3.5rem;
-    display: flex;
-    align-items: center;
-}
-
-.top-row[b-px5a4qzpdx]  a, .top-row[b-px5a4qzpdx]  .btn-link {
-    white-space: nowrap;
-    margin-left: 1.5rem;
-    text-decoration: none;
-}
-
-.top-row[b-px5a4qzpdx]  a:hover, .top-row[b-px5a4qzpdx]  .btn-link:hover {
-    text-decoration: underline;
-}
-
-.top-row[b-px5a4qzpdx]  a:first-child {
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-@media (max-width: 640.98px) {
-    .top-row[b-px5a4qzpdx] {
-        justify-content: space-between;
-    }
-
-    .top-row[b-px5a4qzpdx]  a, .top-row[b-px5a4qzpdx]  .btn-link {
-        margin-left: 0;
-    }
-}
-
-@media (min-width: 641px) {
-    .page[b-px5a4qzpdx] {
-        flex-direction: row;
-    }
-
-    .sidebar[b-px5a4qzpdx] {
-        width: 250px;
-        height: 100vh;
-        position: sticky;
-        top: 0;
-    }
-
-    .top-row[b-px5a4qzpdx] {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-    }
-
-    .top-row.auth[b-px5a4qzpdx]  a:first-child {
-        flex: 1;
-        text-align: right;
-        width: 0;
-    }
-
-    .top-row[b-px5a4qzpdx], article[b-px5a4qzpdx] {
-        padding-left: 2rem !important;
-        padding-right: 1.5rem !important;
-    }
-}
-
-#blazor-error-ui[b-px5a4qzpdx] {
-    background: lightyellow;
-    bottom: 0;
-    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
-    display: none;
-    left: 0;
-    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
-    position: fixed;
-    width: 100%;
-    z-index: 1000;
-}
-
-#blazor-error-ui .dismiss[b-px5a4qzpdx] {
-    cursor: pointer;
-    position: absolute;
-    right: 0.75rem;
-    top: 0.5rem;
+/* This ensures the PanelMenu itself doesn't have its own background,
+   allowing our new sidebar color to show through. */
+[b-px5a4qzpdx].rz-panel-menu.rz-menu {
+    background-color: transparent;
 }

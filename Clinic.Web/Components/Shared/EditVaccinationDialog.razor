@@ -69,7 +69,7 @@
     protected override async Task OnInitializedAsync()
     {
         _inventoryItems = await DbContext.InventoryItems
-            .Where(i => i.Category == "Vaccine")
+            .Where(i => i.Category == "Pharmacy")
             .AsNoTracking()
             .ToListAsync();
 
